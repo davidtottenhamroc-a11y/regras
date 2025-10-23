@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cadastro - VSoft</title>
     <style>
-        /* Reutilizando estilos de login, mas com container de cadastro */
+        /* CSS Ocultado para brevidade - Assumido ser o mesmo */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -160,43 +160,62 @@
     </div>
 
     <script>
-    const API_BASE_URL = 'https://regras-vert.vercel.app/'; 
-    // ... (função showMessage igual) ...
+        // *** URL CORRIGIDA PARA O SEU SERVIDOR VERCEL ***
+        const API_BASE_URL = 'https://regras-vert.vercel.app/api'; 
 
-    document.getElementById('register-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-        const login = document.getElementById('reg-username').value.trim();
-        const senha = document.getElementById('reg-password').value;
-        const level = document.getElementById('reg-level').value;
-        const accessPassword = document.getElementById('access-password').value;
-        const messageElement = document.getElementById('register-message');
-
-        messageElement.style.display = 'none';
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/users`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ login, senha, level, accessPassword })
-            });
-
-            const data = await response.json();
-
-            if (response.ok) {
-                document.getElementById('register-form').reset();
-                showMessage(messageElement, `Usuário ${login} (${level}) cadastrado com sucesso!`, 'success');
-                
-                setTimeout(() => {
-                    window.location.href = 'login.html';
-                }, 2000);
-            } else {
-                showMessage(messageElement, data.message || 'Erro ao cadastrar usuário.', 'error');
-            }
-        } catch (error) {
-            console.error('Register error:', error);
-            showMessage(messageElement, 'Erro de conexão com o servidor.', 'error');
+        function showMessage(element, message, type = 'error', duration = 3000) {
+            element.textContent = message;
+            element.classList.remove('error', 'success');
+            element.classList.add(type);
+            element.style.display = 'block'; 
+            setTimeout(() => element.style.display = 'none', duration);
         }
-    });
-</script>
+
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const login = document.getElementById('reg-username').value.trim();
+            const senha = document.getElementById('reg-password').value;
+            const level = document.getElementById('reg-level').value;
+            const accessPassword = document.getElementById('access-password').value;
+            const messageElement = document.getElementById('register-message');
+
+            messageElement.style.display = 'none'; 
+
+            try {
+                // *** USO OBRIGATÓRIO DO API_BASE_URL ***
+                const response = await fetch(`${API_BASE_URL}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ login, senha, level, accessPassword })
+                });
+
+                let data;
+                try {
+                    data = await response.json();
+                } catch (e) {
+                    // Resposta não JSON (muito comum em erro 500 ou time-out na Vercel)
+                    console.error("Erro: Resposta não é JSON. Status:", response.status);
+                    throw new Error(`Erro do Servidor (Status ${response.status}). Verifique o log do Vercel.`);
+                }
+
+                if (response.ok) {
+                    document.getElementById('register-form').reset();
+                    showMessage(messageElement, data.message || `Usuário ${login} (${level}) cadastrado com sucesso!`, 'success');
+                    
+                    // Redireciona para o login após sucesso
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 2000);
+                } else {
+                    // Trata erros HTTP (400, 403, 409) com a mensagem retornada pelo back-end
+                    showMessage(messageElement, data.message || `Erro de cadastro. Código: ${response.status}.`, 'error');
+                }
+            } catch (error) {
+                console.error('Erro de conexão/API:', error);
+                // Erro de conexão ou a mensagem de erro que lançamos
+                showMessage(messageElement, error.message || 'Erro de conexão com o servidor. Verifique se o Back-end está ativo.', 'error');
+            }
+        });
+    </script>
 </body>
 </html>
