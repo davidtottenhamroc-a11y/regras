@@ -1,8 +1,7 @@
 const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
-const bcrypt = require('bcryptjs'); // Usando bcryptjs para compatibilidade
-// JWT e JWT_SECRET removidos
+const bcrypt = require('bcryptjs'); 
 
 const app = express();
 
@@ -57,18 +56,8 @@ const Memory = mongoose.model('Memory', memorySchema);
 // =====================================
 
 function authenticateSimplificado(req, res, next) {
-    // Para obter regras, precisamos apenas do login (o nível será verificado na rota PUT)
-    const { username, level } = req.body; 
-    
-    // NOTA: No GET, os dados de autenticação (username/level) virão do localStorage do cliente
-    // e devem ser passados via headers ou query params. Adaptando para aceitar no body
-    // para PUT, ou usar um método mais seguro como custom headers para GET.
-    
-    // Neste modelo simplificado, apenas verificamos se há um token (username)
-    // na requisição de regras (GET). O front-end é quem guarda a 'prova' de login.
+    // Verifica se o cliente forneceu o nível de acesso no cabeçalho customizado
     if (!req.headers['x-user-level']) { 
-         // Se não for fornecido o header 'x-user-level', bloqueia (Simulando autenticação)
-         // O front-end será modificado para enviar este header.
          return res.status(401).json({ message: 'Acesso negado. Informações de sessão não fornecidas.' });
     }
 
@@ -82,13 +71,14 @@ function authenticateSimplificado(req, res, next) {
 // =====================================
 
 async function initializeRules() {
+    // **NOTA: Complete esta lista com todas as suas regras**
     const initialRules = [
         { name: "Data de Corte teórico", states: { "AL": "01/02/2022", "PE": "01/01/2018", "PB": "abr./ 2013", "CE": "13/07/2017", "RN": "11/09/2017", "GO": "22/01/2018", "SE": "-", "BA": "-", "ES": "-", "MA": "-" } },
         { name: "Data de Corte prático B", states: { "AL": "31/03/2017", "PE": "01/04/2017 / C, D e E 01/08/2022", "PB": "04/07/2017", "CE": "13/08/2017", "RN": "21/12/2018", "GO": "22/01/2018", "SE": "(Em SERGIPE as datas de corte são por regional)", "BA": "15/12/2019", "ES": "-", "MA": "08/05/2023" } },
         { name: "Tempo minimo regulamentado", states: { "AL": "50 min", "PE": "50 min", "PB": "45 min", "CE": "50 min (5 min tolerância)", "RN": "50 minutos", "GO": "50 min", "SE": "50 min", "BA": "Diurno: 50 min", "ES": "50 min", "MA": "50 min" } },
         { name: "Tipo de pagamento", states: { "AL": "Vsoft/ Conpay", "PE": "REP / CNH Popular", "PB": "Vsoft/ Hab Social", "CE": "Vsoft(conpay) e Sindgestor", "RN": "Conpay", "GO": "Vsoft/ Bludata/ Hypersoft", "SE": "REP", "BA": "GerenciaNet", "ES": "REP", "MA": "REP" } },
         { name: "PROCESSO INICIAL (VER TABELA DE AULAS)", states: { "AL": "VER TABELA DE AULAS", "PE": "VER TABELA DE AULAS", "PB": "VER TABELA DE AULAS", "CE": "VER TABELA DE AULAS", "RN": "VER TABELA DE AULAS", "GO": "VER TABELA DE AULAS", "SE": "VER TABELA DE AULAS", "BA": "VER TABELA DE AULAS", "ES": "VER TABELA DE AULAS", "MA": "VER TABELA DE AULAS" } }
-        // **ATENÇÃO: Inclua aqui todas as outras 20+ linhas do seu CSV "Prático.csv"**
+        // ... (Insira o restante dos seus dados aqui)
     ];
 
     try {
@@ -153,7 +143,7 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ authenticated: false, message: 'Credenciais inválidas.' });
         }
 
-        // Retorna o nível de acesso e o nome do usuário (NÃO retorna token)
+        // Retorna o nível de acesso e o nome do usuário (Será salvo no localStorage do cliente)
         res.json({ 
             authenticated: true, 
             message: 'Login bem-sucedido.',
@@ -183,8 +173,7 @@ app.get('/api/rules', authenticateSimplificado, async (req, res) => {
 
 // Rota para Atualizar uma Regra (Permissão: N2 ou Gestao)
 app.put('/api/rules/:id', authenticateSimplificado, async (req, res) => {
-    // 1. Verifica Permissão
-    // A permissão é baseada no 'level' que o front-end enviou no header 'x-user-level'
+    // 1. Verifica Permissão baseada no header 'X-User-Level'
     const userLevel = req.user.level; 
     if (userLevel !== 'N2' && userLevel !== 'Gestao') {
         return res.status(403).json({ message: 'Permissão negada. Apenas N2 e Gestão podem alterar regras.' });
@@ -198,7 +187,7 @@ app.put('/api/rules/:id', authenticateSimplificado, async (req, res) => {
     }
 
     try {
-        const updateField = `states.${state}`; // Campo dinâmico para o Map
+        const updateField = `states.${state}`; 
         
         const updatedRule = await Rule.findByIdAndUpdate(
             id,
