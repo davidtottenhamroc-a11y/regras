@@ -1,0 +1,210 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Cadastro - VSoft</title>
+    <style>
+        /* Reutilizando estilos de login, mas com container de cadastro */
+        * {
+            box-sizing: border-box;
+            margin: 0;
+            padding: 0;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+        }
+        body {
+            background: linear-gradient(135deg, #0d1a2a 0%, #2c3e50 100%);
+            min-height: 100vh;
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            color: #f4f4f4;
+            padding: 20px;
+        }
+        .register-container {
+            max-width: 450px;
+            width: 100%;
+            background: rgba(255, 255, 255, 0.1);
+            border-radius: 15px;
+            box-shadow: 0 10px 30px rgba(0, 0, 0, 0.3);
+            text-align: center;
+            padding: 40px 30px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            backdrop-filter: blur(10px);
+            -webkit-backdrop-filter: blur(10px);
+        }
+        .logo {
+            font-size: 48px;
+            font-weight: bold;
+            color: #3498db;
+            margin-bottom: 10px;
+        }
+        h1 {
+            font-size: 28px;
+            margin-bottom: 5px;
+        }
+        .description {
+            font-size: 16px;
+            opacity: 0.8;
+            margin-bottom: 30px;
+        }
+        .form-group {
+            margin-bottom: 20px;
+            text-align: left;
+        }
+        label {
+            display: block;
+            font-weight: bold;
+            margin-bottom: 8px;
+        }
+        input[type="text"], input[type="password"], select {
+            width: 100%;
+            padding: 12px;
+            border-radius: 8px;
+            border: 1px solid #ccc;
+            font-size: 16px;
+            background: rgba(255, 255, 255, 0.85);
+            color: #1f1f1f;
+            transition: border-color 0.3s ease;
+        }
+        input:focus, select:focus {
+            outline: none;
+            border-color: #3498db;
+            box-shadow: 0 0 0 3px rgba(52, 152, 219, 0.2);
+        }
+        button {
+            width: 100%;
+            padding: 15px;
+            font-size: 18px;
+            background: linear-gradient(135deg, #28a745, #1e7e34);
+            color: white;
+            border: none;
+            border-radius: 50px;
+            cursor: pointer;
+            font-weight: bold;
+            transition: all 0.3s ease;
+            margin-top: 10px;
+        }
+        button:hover {
+            background: linear-gradient(135deg, #218838, #1e7e34);
+            transform: translateY(-2px);
+            box-shadow: 0 4px 10px rgba(0, 0, 0, 0.2);
+        }
+        .message {
+            margin-top: 15px;
+            font-weight: bold;
+            padding: 10px;
+            border-radius: 8px;
+            display: none; 
+        }
+        .error {
+            color: #dc3545;
+            background-color: #f8d7da;
+        }
+        .success {
+            color: #155724;
+            background-color: #d4edda;
+        }
+        .login-link {
+            display: block;
+            margin-top: 20px;
+            font-size: 0.9em;
+        }
+        .login-link a {
+            color: #3498db;
+            text-decoration: none;
+            font-weight: bold;
+        }
+        .login-link a:hover {
+            text-decoration: underline;
+        }
+    </style>
+</head>
+<body>
+    <div class="register-container">
+        <div class="logo">VSoft</div>
+        <h1>Cadastro de Usuário</h1>
+        <p class="description">Crie uma nova conta e defina o nível de acesso.</p>
+
+        <form id="register-form">
+            <div class="form-group">
+                <label for="reg-username">Novo Usuário (Login):</label>
+                <input type="text" id="reg-username" required>
+            </div>
+
+            <div class="form-group">
+                <label for="reg-password">Nova Senha:</label>
+                <input type="password" id="reg-password" required>
+            </div>
+
+            <div class="form-group">
+                <label for="reg-level">Nível de Acesso:</label>
+                <select id="reg-level" required>
+                    <option value="N1">N1 (Visualiza PE)</option>
+                    <option value="N2">N2 (Visualiza e Edita)</option>
+                    <option value="Gestao">Gestão (Visualiza e Edita)</option>
+                </select>
+            </div>
+            
+            <div class="form-group">
+                <label for="access-password">Senha Mestra para Cadastro (otimus32):</label>
+                <input type="password" id="access-password" required>
+            </div>
+
+            <button type="submit">Cadastrar</button>
+        </form>
+        <p class="message" id="register-message"></p>
+        <p class="login-link">
+            Já tem conta? <a href="login.html">Fazer Login</a>
+        </p>
+    </div>
+
+    <script>
+        const API_BASE_URL = 'http://localhost:3000/api'; 
+
+        function showMessage(element, message, type = 'error', duration = 3000) {
+            element.textContent = message;
+            element.classList.remove('error', 'success');
+            element.classList.add(type);
+            element.style.display = 'block';
+            setTimeout(() => element.style.display = 'none', duration);
+        }
+
+        document.getElementById('register-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+            const login = document.getElementById('reg-username').value.trim();
+            const senha = document.getElementById('reg-password').value;
+            const level = document.getElementById('reg-level').value;
+            const accessPassword = document.getElementById('access-password').value;
+            const messageElement = document.getElementById('register-message');
+
+            messageElement.style.display = 'none';
+
+            try {
+                const response = await fetch(`${API_BASE_URL}/users`, {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    body: JSON.stringify({ login, senha, level, accessPassword })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    document.getElementById('register-form').reset();
+                    showMessage(messageElement, `Usuário ${login} (${level}) cadastrado com sucesso!`, 'success');
+                    
+                    // Redireciona para o login após sucesso
+                    setTimeout(() => {
+                        window.location.href = 'login.html';
+                    }, 2000);
+                } else {
+                    showMessage(messageElement, data.message || 'Erro ao cadastrar usuário.', 'error');
+                }
+            } catch (error) {
+                console.error('Register error:', error);
+                showMessage(messageElement, 'Erro de conexão com o servidor.', 'error');
+            }
+        });
+    </script>
+</body>
+</html>
