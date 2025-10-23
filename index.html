@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>[Super Prático] Resumo das Regras dos Estados (Full Stack)</title>
+    <title>[Super Prático] Resumo das Regras dos Estados</title>
     
     <style>
         body {
@@ -148,7 +148,7 @@
     <div id="login-screen" class="container">
         <h1>Login</h1>
         <form id="login-form">
-            <label for="username">Usuário:</label>
+            <label for="username">Usuário (Login):</label>
             <input type="text" id="username" required>
 
             <label for="password">Senha:</label>
@@ -163,18 +163,21 @@
     <div id="register-screen" class="container hidden">
         <h1>Cadastro de Usuário</h1>
         <form id="register-form">
-            <label for="reg-username">Novo Usuário:</label>
+            <label for="reg-username">Novo Usuário (Login):</label>
             <input type="text" id="reg-username" required>
 
             <label for="reg-password">Nova Senha:</label>
             <input type="password" id="reg-password" required>
-
+            
             <label for="reg-level">Nível de Acesso:</label>
             <select id="reg-level" required>
-                <option value="N1">N1 (Visualiza N2)</option>
+                <option value="N1">N1 (Visualiza PE)</option>
                 <option value="N2">N2 (Visualiza e Edita)</option>
                 <option value="Gestao">Gestão (Visualiza e Edita)</option>
             </select>
+            
+            <label for="access-password">Senha Mestra para Cadastro:</label>
+            <input type="password" id="access-password" required>
 
             <button type="submit">Cadastrar</button>
         </form>
@@ -203,7 +206,7 @@
 
         <div id="status-message" class="message success hidden"></div>
         <p>
-            **Permissões (Requer Back-end em Node.js com Mongo ativo):**
+            **Permissões:**
             <ul>
                 <li>**N1:** Só pode ver a coluna **'DADOS DA REGRA'** e a coluna do estado de **'PE'** (Pernambuco).</li>
                 <li>**N2 e Gestão:** Podem ver todas as colunas e **clicar em qualquer regra** para editar.</li>
@@ -212,8 +215,10 @@
     </div>
 
     <script>
-        // **IMPORTANTE: Configure a URL do seu servidor Node.js aqui**
-        const API_BASE_URL = 'http://localhost:3000/api'; 
+        // **IMPORTANTE: Mantenha a URL do seu servidor Node.js aqui**
+        // Se estiver rodando localmente: http://localhost:3000
+        // Se estiver em produção (Vercel): Sua URL de domínio
+        const API_BASE_URL = 'https://regras-vert.vercel.app/'; 
         
         // VARIÁVEIS GLOBAIS DE ESTADO E AUTENTICAÇÃO
         let currentUser = null;
@@ -267,11 +272,16 @@
         function restoreSession() {
             const session = localStorage.getItem('session');
             if (session) {
-                const { currentUser: user, currentLevel: level, authToken: token } = JSON.parse(session);
-                currentUser = user;
-                currentLevel = level;
-                authToken = token;
-                updateAuthDisplay();
+                try {
+                    const { currentUser: user, currentLevel: level, authToken: token } = JSON.parse(session);
+                    currentUser = user;
+                    currentLevel = level;
+                    authToken = token;
+                    updateAuthDisplay();
+                } catch (e) {
+                    console.error("Erro ao restaurar sessão:", e);
+                    localStorage.removeItem('session');
+                }
             }
         }
 
@@ -309,28 +319,25 @@
 
         async function handleRegister(event) {
             event.preventDefault();
-            const username = document.getElementById('reg-username').value.trim();
-            const password = document.getElementById('reg-password').value;
+            const login = document.getElementById('reg-username').value.trim();
+            const senha = document.getElementById('reg-password').value;
             const level = document.getElementById('reg-level').value;
+            const accessPassword = document.getElementById('access-password').value;
 
             registerMessage.classList.add('hidden');
             
-            // Permissão: Apenas Gestão (ou o primeiro usuário) pode cadastrar
-            // O controle mais rigoroso de quem pode cadastrar N2/Gestão deve ser feito no back-end.
-            
             try {
-                const response = await fetch(`${API_BASE_URL}/register`, {
+                const response = await fetch(`${API_BASE_URL}/users`, { // Usando a rota /api/users
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
-                    // Envia o token de Gestão, se houver, para o back-end verificar permissão
-                    body: JSON.stringify({ username, password, level, creatorToken: authToken })
+                    body: JSON.stringify({ login, senha, level, accessPassword })
                 });
 
                 const data = await response.json();
 
                 if (response.ok) {
                     registerForm.reset();
-                    showMessage(registerMessage, data.message || `Usuário ${username} (${level}) cadastrado com sucesso!`, 'success');
+                    showMessage(registerMessage, `Usuário ${login} (${level}) cadastrado com sucesso!`, 'success');
                     
                     setTimeout(() => document.getElementById('show-login').click(), 2000);
                 } else {
@@ -359,6 +366,12 @@
                 });
 
                 if (!response.ok) {
+                    // Se a busca falhar (token inválido/expirado), faz logout
+                    if (response.status === 401 || response.status === 403) {
+                        handleLogout();
+                        showMessage(loginMessage, "Sessão expirada. Por favor, faça login novamente.", "error", 5000);
+                        return;
+                    }
                     throw new Error('Falha ao buscar as regras.');
                 }
 
@@ -392,7 +405,8 @@
                             td.textContent = ruleName;
                             td.style.fontWeight = 'bold';
                         } else {
-                            const cellValue = rule.states[state] || '-';
+                            // Encontra o valor no Map 'states' do objeto rule
+                            const cellValue = rule.states[state] || '-'; 
                             td.textContent = cellValue;
                             
                             // Células editáveis (N2 e Gestão)
@@ -514,7 +528,7 @@
             registerMessage.classList.add('hidden');
         });
 
-        // Login e Logout
+        // Login e Cadastro
         loginForm.addEventListener('submit', handleLogin);
         logoutButton.addEventListener('click', handleLogout);
         registerForm.addEventListener('submit', handleRegister);
