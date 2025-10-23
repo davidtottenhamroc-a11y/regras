@@ -1,239 +1,218 @@
-// VARIÁVEIS GLOBAIS
-let currentUser = null;
-let currentLevel = null;
-const tableBody = document.getElementById('table-body');
-const tableHeader = document.getElementById('table-header');
-const mainSystem = document.getElementById('main-system');
-const loginScreen = document.getElementById('login-screen');
-const registerScreen = document.getElementById('register-screen');
-const loginForm = document.getElementById('login-form');
-const registerForm = document.getElementById('register-form');
-const logoutButton = document.getElementById('logout-button');
-const loginMessage = document.getElementById('login-message');
-const registerMessage = document.getElementById('register-message');
-const statusMessage = document.getElementById('status-message');
+const express = require('express');
+const mongoose = require('mongoose');
+const jwt = require('jsonwebtoken');
+const bcrypt = require('bcryptjs');
+const cors = require('cors');
 
-// --- 1. FUNÇÕES DE AUTENTICAÇÃO E PERMISSÃO ---
+const app = express();
+const PORT = 3000;
+const MONGO_URI = 'mongodb://localhost:27017/regrasdb'; // Mude para sua URI do Mongo
+const JWT_SECRET = 'sua_chave_secreta_aqui'; // Mude para uma chave secreta forte
 
-function updateAuthDisplay() {
-    if (currentUser && currentLevel) {
-        loginScreen.classList.add('hidden');
-        registerScreen.classList.add('hidden');
-        mainSystem.classList.remove('hidden');
-        document.getElementById('current-user').textContent = currentUser;
-        document.getElementById('current-level').textContent = currentLevel;
-        renderRulesTable(); // Renderiza a tabela após o login
-    } else {
-        loginScreen.classList.remove('hidden');
-        registerScreen.classList.add('hidden');
-        mainSystem.classList.add('hidden');
-    }
-}
+app.use(cors()); // Permite requisições do front-end (index.html)
+app.use(express.json());
 
-function handleLogin(event) {
-    event.preventDefault();
-    const username = document.getElementById('username').value.trim();
-    const password = document.getElementById('password').value;
-    
-    loginMessage.classList.add('hidden');
+// ==============================
+// 1. CONEXÃO COM O MONGO DB
+// ==============================
+mongoose.connect(MONGO_URI)
+    .then(() => console.log('Conectado ao MongoDB.'))
+    .catch(err => console.error('Erro de conexão ao MongoDB:', err));
 
-    if (USERS[username] && USERS[username].password === password) {
-        currentUser = username;
-        currentLevel = USERS[username].level;
-        updateAuthDisplay();
-    } else {
-        loginMessage.textContent = 'Usuário ou senha inválidos.';
-        loginMessage.classList.remove('hidden');
-    }
-}
+// ==============================
+// 2. SCHEMAS E MODELOS
+// ==============================
 
-function handleRegister(event) {
-    event.preventDefault();
-    const username = document.getElementById('reg-username').value.trim();
-    const password = document.getElementById('reg-password').value;
-    const level = document.getElementById('reg-level').value;
-
-    registerMessage.classList.add('hidden');
-
-    if (USERS[username]) {
-        registerMessage.textContent = 'Usuário já existe. Tente outro.';
-        registerMessage.classList.remove('hidden');
-        return;
-    }
-
-    if (username && password) {
-        USERS[username] = { password, level };
-        saveData(); // Salva o novo usuário
-        registerForm.reset();
-        
-        registerMessage.textContent = `Usuário ${username} (${level}) cadastrado com sucesso!`;
-        registerMessage.classList.remove('hidden');
-        registerMessage.classList.replace('error', 'success');
-        
-        // Volta para a tela de login
-        setTimeout(() => {
-            document.getElementById('show-login').click();
-            registerMessage.classList.add('hidden');
-        }, 2000);
-    }
-}
-
-function handleLogout() {
-    currentUser = null;
-    currentLevel = null;
-    updateAuthDisplay();
-    loginForm.reset();
-}
-
-// --- 2. FUNÇÕES DE RENDERIZAÇÃO E EDIÇÃO DA TABELA ---
-
-function renderRulesTable() {
-    // 1. Renderiza o cabeçalho (Estados)
-    tableHeader.innerHTML = '';
-    STATES.forEach(state => {
-        const th = document.createElement('th');
-        th.textContent = state;
-        tableHeader.appendChild(th);
-    });
-
-    // 2. Renderiza o corpo da tabela
-    tableBody.innerHTML = '';
-    const isEditable = currentLevel === 'N2' || currentLevel === 'Gestao';
-    
-    // Filtra as colunas que o N1 pode ver se o nível for N1
-    const allowedStates = (currentLevel === 'N1') ? STATES.filter(s => s === 'DADOS DA REGRA' || s === 'PE') : STATES;
-
-    Object.keys(RULES_DATA).forEach(ruleName => {
-        const tr = document.createElement('tr');
-        
-        allowedStates.forEach(state => {
-            const td = document.createElement('td');
-            
-            if (state === 'DADOS DA REGRA') {
-                td.textContent = ruleName;
-                td.style.fontWeight = 'bold';
-            } else {
-                const cellValue = RULES_DATA[ruleName][state] || '-';
-                td.textContent = cellValue;
-                
-                // Aplica a lógica de permissão de visualização para N1
-                // N1 só pode ver a regra (primeira coluna) e PE (Pernambuco)
-                if (currentLevel === 'N1' && state !== 'PE') {
-                    // Células de outros estados para N1 (apenas no protótipo, mas o allowedStates já filtra a renderização)
-                } else {
-                    // Células editáveis (N2 e Gestão)
-                    if (isEditable) {
-                        td.classList.add('rule-cell');
-                        td.dataset.rule = ruleName;
-                        td.dataset.state = state;
-                        td.addEventListener('click', handleCellClick);
-                    }
-                }
-            }
-            tr.appendChild(td);
-        });
-        tableBody.appendChild(tr);
-    });
-
-    // Se N1, esconde a tabela caso não tenha permissão de visualização, mas a lógica acima já filtrou.
-}
-
-function handleCellClick(event) {
-    const td = event.target;
-    const ruleName = td.dataset.rule;
-    const state = td.dataset.state;
-    const originalValue = td.textContent;
-
-    // Se o usuário já estiver editando, não faz nada
-    if (td.querySelector('textarea')) return;
-
-    // Cria o campo de edição (textarea)
-    const textarea = document.createElement('textarea');
-    textarea.value = originalValue;
-    textarea.style.width = '100%';
-    textarea.style.minHeight = '50px';
-    textarea.style.boxSizing = 'border-box';
-
-    // Cria o botão de salvar
-    const saveButton = document.createElement('button');
-    saveButton.textContent = 'Salvar';
-    saveButton.style.marginTop = '5px';
-    saveButton.style.display = 'block';
-
-    // Cria o botão de cancelar
-    const cancelButton = document.createElement('button');
-    cancelButton.textContent = 'Cancelar';
-    cancelButton.style.marginTop = '5px';
-    cancelButton.style.marginLeft = '5px';
-    cancelButton.style.backgroundColor = '#6c757d'; // Cinza
-
-    // Função para finalizar a edição
-    const finalizeEdit = (newValue = originalValue) => {
-        td.textContent = newValue;
-        td.appendChild(saveButton); // Remove botões e textarea
-        td.removeChild(textarea);
-        td.removeChild(saveButton);
-        td.removeChild(cancelButton);
-        td.addEventListener('click', handleCellClick); // Reativa o clique
-    };
-
-    // Lógica de SALVAR
-    saveButton.addEventListener('click', () => {
-        const newValue = textarea.value.trim();
-        
-        // Atualiza a estrutura de dados (RULES_DATA)
-        RULES_DATA[ruleName][state] = newValue;
-        saveData(); // Salva no localStorage
-
-        // Atualiza a célula e finaliza a edição
-        finalizeEdit(newValue);
-        
-        // Feedback de sucesso
-        statusMessage.textContent = `Regra de ${ruleName} em ${state} atualizada por ${currentUser} (${currentLevel}).`;
-        statusMessage.classList.remove('hidden', 'error');
-        statusMessage.classList.add('success');
-        setTimeout(() => statusMessage.classList.add('hidden'), 5000);
-    });
-    
-    // Lógica de CANCELAR
-    cancelButton.addEventListener('click', () => {
-        finalizeEdit(originalValue);
-    });
-
-
-    // Substitui o conteúdo da célula pelos campos de edição
-    td.textContent = '';
-    td.removeEventListener('click', handleCellClick);
-    td.appendChild(textarea);
-    td.appendChild(saveButton);
-    td.appendChild(cancelButton);
-    textarea.focus();
-}
-
-// --- 3. EVENT LISTENERS E INICIALIZAÇÃO ---
-
-document.addEventListener('DOMContentLoaded', () => {
-    loadData(); // Carrega dados e usuários do localStorage
-    updateAuthDisplay();
+// Schema do Usuário (N1, N2, Gestao)
+const userSchema = new mongoose.Schema({
+    username: { type: String, required: true, unique: true },
+    password: { type: String, required: true },
+    level: { type: String, enum: ['N1', 'N2', 'Gestao'], default: 'N1' }
 });
 
-// Switch entre Login e Cadastro
-document.getElementById('show-register').addEventListener('click', (e) => {
-    e.preventDefault();
-    loginScreen.classList.add('hidden');
-    registerScreen.classList.remove('hidden');
-    loginMessage.classList.add('hidden');
+// Pré-save para hash de senha
+userSchema.pre('save', async function(next) {
+    if (this.isModified('password')) {
+        this.password = await bcrypt.hash(this.password, 10);
+    }
+    next();
 });
 
-document.getElementById('show-login').addEventListener('click', (e) => {
-    e.preventDefault();
-    registerScreen.classList.add('hidden');
-    loginScreen.classList.remove('hidden');
-    registerMessage.classList.add('hidden');
+const User = mongoose.model('User', userSchema);
+
+// Schema das Regras (Baseado nos dados do CSV)
+const ruleSchema = new mongoose.Schema({
+    name: { type: String, required: true, unique: true },
+    states: { type: Map, of: String } // Armazena pares de estado:regra (ex: PE: "50 min")
 });
 
+const Rule = mongoose.model('Rule', ruleSchema);
 
-// Login e Logout
-loginForm.addEventListener('submit', handleLogin);
-logoutButton.addEventListener('click', handleLogout);
-registerForm.addEventListener('submit', handleRegister);
+// ==============================
+// 3. MIDDLEWARE DE AUTENTICAÇÃO
+// ==============================
+function authenticateToken(req, res, next) {
+    const authHeader = req.headers['authorization'];
+    const token = authHeader && authHeader.split(' ')[1];
+
+    if (token == null) return res.status(401).json({ message: 'Token não fornecido.' });
+
+    jwt.verify(token, JWT_SECRET, (err, user) => {
+        if (err) return res.status(403).json({ message: 'Token inválido ou expirado.' });
+        req.user = user; // Adiciona os dados do usuário (username, level) ao request
+        next();
+    });
+}
+
+// ==============================
+// 4. ROTAS DE AUTENTICAÇÃO (API)
+// ==============================
+
+// Rota para Iniciar o Banco de Dados com as Regras Iniciais
+async function initializeRules() {
+    const initialRules = [
+        { name: "Data de Corte teórico", states: { "AL": "01/02/2022", "PE": "01/01/2018", "PB": "abr./ 2013", "CE": "13/07/2017", "RN": "11/09/2017", "GO": "22/01/2018", "SE": "-", "BA": "-", "ES": "-", "MA": "-" } },
+        { name: "Data de Corte prático B", states: { "AL": "31/03/2017", "PE": "01/04/2017 / C, D e E 01/08/2022", "PB": "04/07/2017", "CE": "13/08/2017", "RN": "21/12/2018", "GO": "22/01/2018", "SE": "(Em SERGIPE as datas de corte são por regional)", "BA": "15/12/2019", "ES": "-", "MA": "08/05/2023" } },
+        { name: "Tempo minimo regulamentado", states: { "AL": "50 min", "PE": "50 min", "PB": "45 min", "CE": "50 min (5 min tolerância)", "RN": "50 minutos", "GO": "50 min", "SE": "50 min", "BA": "Diurno: 50 min", "ES": "50 min", "MA": "50 min" } },
+        // ... (Insira todas as regras do seu CSV aqui) ...
+    ];
+
+    try {
+        for (const rule of initialRules) {
+            // Insere apenas se a regra não existir
+            await Rule.findOneAndUpdate({ name: rule.name }, rule, { upsert: true, new: true });
+        }
+        console.log('Regras iniciais garantidas no banco de dados.');
+    } catch (error) {
+        console.error('Erro ao inicializar as regras:', error);
+    }
+}
+// Chame esta função na inicialização:
+mongoose.connection.once('open', initializeRules);
+
+
+// Rota de Cadastro de Usuário
+app.post('/api/register', async (req, res) => {
+    const { username, password, level } = req.body;
+    
+    if (!username || !password || !level) {
+        return res.status(400).json({ message: 'Faltam dados: username, password e level são obrigatórios.' });
+    }
+
+    try {
+        const userCount = await User.countDocuments();
+        
+        // Regra de segurança: Se for o primeiro usuário, pode se cadastrar como Gestão
+        if (userCount === 0) {
+            const newUser = new User({ username, password, level: 'Gestao' });
+            await newUser.save();
+            return res.status(201).json({ message: 'Primeiro usuário (Gestão) cadastrado com sucesso.' });
+        }
+        
+        // Se não for o primeiro, é necessário estar logado como 'Gestao' para cadastrar.
+        const authHeader = req.headers['authorization'];
+        const token = authHeader && authHeader.split(' ')[1];
+        
+        if (!token) {
+             return res.status(403).json({ message: 'Cadastro restrito. Faça login primeiro.' });
+        }
+
+        const decoded = jwt.verify(token, JWT_SECRET);
+        
+        if (decoded.level !== 'Gestao') {
+            return res.status(403).json({ message: 'Apenas usuários de Gestão podem cadastrar novos usuários.' });
+        }
+        
+        // Se for Gestão, permite o cadastro
+        const newUser = new User({ username, password, level });
+        await newUser.save();
+        return res.status(201).json({ message: `Usuário ${level} cadastrado com sucesso por Gestão.` });
+
+    } catch (error) {
+        if (error.code === 11000) {
+            return res.status(400).json({ message: 'Nome de usuário já existe.' });
+        }
+        console.error(error);
+        res.status(500).json({ message: 'Erro interno do servidor ao cadastrar.' });
+    }
+});
+
+// Rota de Login
+app.post('/api/login', async (req, res) => {
+    const { username, password } = req.body;
+    
+    const user = await User.findOne({ username });
+    if (!user) {
+        return res.status(400).json({ message: 'Usuário não encontrado.' });
+    }
+
+    const isMatch = await bcrypt.compare(password, user.password);
+    if (!isMatch) {
+        return res.status(400).json({ message: 'Senha incorreta.' });
+    }
+
+    // Cria e assina o token JWT
+    const token = jwt.sign({ id: user._id, username: user.username, level: user.level }, JWT_SECRET, { expiresIn: '1h' });
+
+    res.json({
+        message: 'Login realizado com sucesso.',
+        username: user.username,
+        level: user.level,
+        token
+    });
+});
+
+// ==============================
+// 5. ROTAS DE REGRAS (PROTEGIDAS)
+// ==============================
+
+// Rota para Obter Todas as Regras
+app.get('/api/rules', authenticateToken, async (req, res) => {
+    try {
+        const rules = await Rule.find();
+        res.json(rules);
+    } catch (error) {
+        res.status(500).json({ message: 'Erro ao buscar regras.' });
+    }
+});
+
+// Rota para Atualizar uma Regra (Permissão: N2 ou Gestao)
+app.put('/api/rules/:id', authenticateToken, async (req, res) => {
+    // Verifica permissão
+    const userLevel = req.user.level;
+    if (userLevel !== 'N2' && userLevel !== 'Gestao') {
+        return res.status(403).json({ message: 'Permissão negada. Apenas N2 e Gestão podem alterar regras.' });
+    }
+    
+    const { id } = req.params;
+    const { state, value } = req.body;
+
+    if (!state || value === undefined) {
+        return res.status(400).json({ message: 'Dados incompletos para atualização.' });
+    }
+
+    try {
+        const updateField = `states.${state}`; // Cria a chave dinâmica para o campo Map
+        
+        const updatedRule = await Rule.findByIdAndUpdate(
+            id,
+            { $set: { [updateField]: value } },
+            { new: true, runValidators: true }
+        );
+
+        if (!updatedRule) {
+            return res.status(404).json({ message: 'Regra não encontrada.' });
+        }
+
+        res.json({ message: `Regra atualizada com sucesso para ${state}.`, rule: updatedRule });
+    } catch (error) {
+        console.error(error);
+        res.status(500).json({ message: 'Erro interno ao atualizar a regra.' });
+    }
+});
+
+// Inicializa o Servidor
+app.listen(PORT, () => {
+    console.log(`Servidor rodando na porta http://localhost:${PORT}`);
+    console.log(`API acessível em http://localhost:${PORT}/api`);
+});
