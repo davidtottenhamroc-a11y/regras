@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Login - VSoft</title>
     <style>
-        /* Seu CSS Existente */
+        /* ... (CSS Omitido) ... */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -83,7 +83,7 @@
             cursor: pointer;
             font-weight: bold;
             transition: all 0.3s ease;
-            margin-top: 10px; /* Adicionado para separar do botão */
+            margin-top: 10px;
         }
         button:hover {
             background: linear-gradient(135deg, #218838, #1e7e34);
@@ -135,13 +135,10 @@
     </div>
 
     <script>
-        // *** CORREÇÃO: Usando a URL da Vercel para comunicação BACK-END ***
-        const API_BASE_URL = 'https://regras-vert.vercel.app/api'; 
-        
         document.addEventListener('DOMContentLoaded', () => {
-             // Redireciona se a sessão já estiver ativa (verifica o localStorage)
+             // Redireciona se a sessão já estiver ativa
             if (localStorage.getItem('session')) {
-                window.location.href = 'rules.html';
+                window.location.href = 'rules.html'; 
                 return;
             }
         });
@@ -153,12 +150,11 @@
             const password = document.getElementById('password').value;
             const errorMessage = document.getElementById('error-message');
 
-            // Oculta a mensagem de erro antes de uma nova tentativa
             errorMessage.style.display = 'none';
 
             try {
-                // Requisição usando o API_BASE_URL completo
-                const response = await fetch(`${API_BASE_URL}/login`, {
+                // *** REQUISIÇÃO RELATIVA: FUNCIONA SE O ROUTING DA VERCEL ESTIVER CORRETO ***
+                const response = await fetch('/api/login', { 
                     method: 'POST',
                     headers: {
                         'Content-Type': 'application/json',
@@ -169,24 +165,21 @@
                 const data = await response.json();
 
                 if (response.ok && data.authenticated) {
-                    // Salva a sessão simplificada no localStorage (username e level)
+                    // Salva a sessão simplificada no localStorage
                     const sessionData = {
                         currentUser: data.username,
                         currentLevel: data.level,
                     };
                     localStorage.setItem('session', JSON.stringify(sessionData));
                     
-                    // Redireciona para a tela de regras
                     window.location.href = 'rules.html';
                 } else {
-                    // O servidor indicou falha de autenticação
                     errorMessage.textContent = data.message || 'Usuário ou senha incorretos. Tente novamente.';
                     errorMessage.style.display = 'block';
                 }
             } catch (error) {
-                // Erro de rede ou servidor não está online/acessível
                 console.error('Erro:', error);
-                errorMessage.textContent = 'Erro ao conectar com o servidor. Tente novamente mais tarde.';
+                errorMessage.textContent = 'Erro de conexão com o servidor. Verifique o roteamento da Vercel.';
                 errorMessage.style.display = 'block';
             }
         });
