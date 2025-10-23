@@ -6,6 +6,7 @@
     <title>Painel de Regras dos Estados</title>
     
     <style>
+        /* ... (CSS Omitido) ... */
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
@@ -155,8 +156,8 @@
     </div>
 
     <script>
-    // **IMPORTANTE: Mantenha a URL do seu servidor Node.js aqui**
-    const API_BASE_URL = 'https://regras-vert.vercel.app/'; 
+    // URL base é vazia para usar o caminho relativo /api/ (funciona se o roteamento Vercel estiver correto)
+    const API_BASE_URL = ''; 
     
     // VARIÁVEIS GLOBAIS DE ESTADO (SEM TOKEN)
     let currentUser = null;
@@ -164,13 +165,42 @@
     
     const STATES = ["DADOS DA REGRA", "AL", "PE", "PB", "CE", "RN", "GO", "SE", "BA", "ES", "MA"];
     
-    // ... (Elementos DOM e funções showMessage/updateAuthDisplay/handleLogout iguais) ...
+    const tableBody = document.getElementById('table-body');
+    const tableHeader = document.getElementById('table-header');
+    const mainSystem = document.getElementById('main-system');
+    const logoutButton = document.getElementById('logout-button');
+    const statusMessage = document.getElementById('status-message');
+
+
+    // FUNÇÃO DE FEEDBACK VISUAL (CORRIGIDA E ADICIONADA AQUI)
+    function showMessage(element, message, type = 'error', duration = 3000) {
+        element.textContent = message;
+        element.classList.remove('hidden', 'success', 'error');
+        element.classList.add(type);
+        setTimeout(() => element.classList.add('hidden'), duration);
+    }
+
+    function updateAuthDisplay() {
+        if (currentUser && currentLevel) {
+            mainSystem.classList.remove('hidden');
+            document.getElementById('current-user').textContent = currentUser;
+            document.getElementById('current-level').textContent = currentLevel;
+            renderRulesTable();
+        } else {
+            // Se não houver sessão válida, redireciona para o login
+            window.location.href = 'login.html'; 
+        }
+    }
+    
+    function handleLogout() {
+        localStorage.removeItem('session');
+        window.location.href = 'login.html';
+    }
 
     function restoreSession() {
         const session = localStorage.getItem('session');
         if (session) {
             try {
-                // Recupera SEM o token
                 const { currentUser: user, currentLevel: level } = JSON.parse(session);
                 currentUser = user;
                 currentLevel = level;
@@ -184,14 +214,15 @@
         }
     }
 
+
     // --- 2. RENDERIZAÇÃO E EDIÇÃO DA TABELA (AJUSTADO PARA USAR HEADER SIMPLIFICADO) ---
 
     async function renderRulesTable() {
         try {
-            // ENVIANDO O NÍVEL DE ACESSO VIA HEADER CUSTOMIZADO
-            const response = await fetch(`${API_BASE_URL}/rules`, {
+            // Requisição com caminho relativo
+            const response = await fetch(`${API_BASE_URL}/api/rules`, {
                 headers: { 
-                    'X-User-Level': currentLevel // Novo Header Simplificado
+                    'X-User-Level': currentLevel 
                 }
             });
 
@@ -204,8 +235,6 @@
             }
 
             const rulesData = await response.json();
-            
-            // ... (Lógica de renderização da tabela igual, usando currentLevel para permissão) ...
             
             const allowedStates = (currentLevel === 'N1') 
                 ? STATES.filter(s => s === 'DADOS DA REGRA' || s === 'PE') 
@@ -257,13 +286,33 @@
     }
 
     function handleCellClick(event) {
-        // ... (Criação de textarea e botões igual) ...
         const td = event.target;
         const ruleId = td.dataset.ruleId;
         const stateKey = td.dataset.stateKey;
         const originalValue = td.textContent;
-        // ... (Criação de textarea, saveButton, cancelButton) ...
+
+        if (td.querySelector('textarea')) return;
+
+        const textarea = document.createElement('textarea');
+        textarea.value = originalValue;
+        textarea.style.width = '100%';
+        textarea.style.minHeight = '50px';
+        textarea.style.boxSizing = 'border-box';
+
+        const saveButton = document.createElement('button');
+        saveButton.textContent = 'Salvar';
         
+        const cancelButton = document.createElement('button');
+        cancelButton.textContent = 'Cancelar';
+        cancelButton.style.backgroundColor = '#6c757d';
+        cancelButton.style.marginLeft = '5px';
+
+        const buttonGroup = document.createElement('div');
+        buttonGroup.style.display = 'flex';
+        buttonGroup.style.marginTop = '5px';
+        buttonGroup.appendChild(saveButton);
+        buttonGroup.appendChild(cancelButton);
+
         const finalizeEdit = (newValue = originalValue) => {
             td.textContent = newValue;
             td.removeChild(textarea);
@@ -276,12 +325,12 @@
             const newValue = textarea.value.trim();
             
             try {
-                // ENVIANDO O NÍVEL DE ACESSO VIA HEADER CUSTOMIZADO
-                const response = await fetch(`${API_BASE_URL}/rules/${ruleId}`, {
+                // Requisição com caminho relativo
+                const response = await fetch(`${API_BASE_URL}/api/rules/${ruleId}`, {
                     method: 'PUT',
                     headers: { 
                         'Content-Type': 'application/json',
-                        'X-User-Level': currentLevel // Novo Header Simplificado
+                        'X-User-Level': currentLevel
                     },
                     body: JSON.stringify({ state: stateKey, value: newValue })
                 });
@@ -302,8 +351,12 @@
             }
         });
         
-        // ... (Lógica de Cancelar e anexar ao DOM igual) ...
-        
+        // Lógica de Cancelar
+        cancelButton.addEventListener('click', () => {
+            finalizeEdit(originalValue);
+            statusMessage.classList.add('hidden');
+        });
+
         // Substitui o conteúdo da célula pelos campos de edição
         td.textContent = '';
         td.removeEventListener('click', handleCellClick);
