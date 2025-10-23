@@ -160,51 +160,43 @@
     </div>
 
     <script>
-        const API_BASE_URL = 'http://localhost:3000/api'; 
+    const API_BASE_URL = 'https://regras-vert.vercel.app/'; 
+    // ... (função showMessage igual) ...
 
-        function showMessage(element, message, type = 'error', duration = 3000) {
-            element.textContent = message;
-            element.classList.remove('error', 'success');
-            element.classList.add(type);
-            element.style.display = 'block';
-            setTimeout(() => element.style.display = 'none', duration);
-        }
+    document.getElementById('register-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+        const login = document.getElementById('reg-username').value.trim();
+        const senha = document.getElementById('reg-password').value;
+        const level = document.getElementById('reg-level').value;
+        const accessPassword = document.getElementById('access-password').value;
+        const messageElement = document.getElementById('register-message');
 
-        document.getElementById('register-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-            const login = document.getElementById('reg-username').value.trim();
-            const senha = document.getElementById('reg-password').value;
-            const level = document.getElementById('reg-level').value;
-            const accessPassword = document.getElementById('access-password').value;
-            const messageElement = document.getElementById('register-message');
+        messageElement.style.display = 'none';
 
-            messageElement.style.display = 'none';
+        try {
+            const response = await fetch(`${API_BASE_URL}/users`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ login, senha, level, accessPassword })
+            });
 
-            try {
-                const response = await fetch(`${API_BASE_URL}/users`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ login, senha, level, accessPassword })
-                });
+            const data = await response.json();
 
-                const data = await response.json();
-
-                if (response.ok) {
-                    document.getElementById('register-form').reset();
-                    showMessage(messageElement, `Usuário ${login} (${level}) cadastrado com sucesso!`, 'success');
-                    
-                    // Redireciona para o login após sucesso
-                    setTimeout(() => {
-                        window.location.href = 'login.html';
-                    }, 2000);
-                } else {
-                    showMessage(messageElement, data.message || 'Erro ao cadastrar usuário.', 'error');
-                }
-            } catch (error) {
-                console.error('Register error:', error);
-                showMessage(messageElement, 'Erro de conexão com o servidor.', 'error');
+            if (response.ok) {
+                document.getElementById('register-form').reset();
+                showMessage(messageElement, `Usuário ${login} (${level}) cadastrado com sucesso!`, 'success');
+                
+                setTimeout(() => {
+                    window.location.href = 'login.html';
+                }, 2000);
+            } else {
+                showMessage(messageElement, data.message || 'Erro ao cadastrar usuário.', 'error');
             }
-        });
-    </script>
+        } catch (error) {
+            console.error('Register error:', error);
+            showMessage(messageElement, 'Erro de conexão com o servidor.', 'error');
+        }
+    });
+</script>
 </body>
 </html>
