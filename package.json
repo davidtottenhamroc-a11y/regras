@@ -1,0 +1,15 @@
+{
+  "name": "regras-estados",
+  "version": "1.0.0",
+  "description": "Tabela de Regras Para estados",
+  "main": "api/script.js",
+  "scripts": {
+    "start": "node api/script.js"
+  },
+  "dependencies": {
+    "express": "^4.19.2",
+    "mongoose": "^8.4.1",
+    "cors": "^2.8.5",
+    "bcrypt": "^5.1.1" 
+  }
+}
