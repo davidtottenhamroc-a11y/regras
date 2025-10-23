@@ -3,7 +3,17 @@
 
     {
       "source": "/",
-      "destination": "/index.html" 
+      "destination": "/login.html" 
+      
+    },
+    {
+      "source": "/",
+      "destination": "/register.html" 
+      
+    },
+    {
+      "source": "/",
+      "destination": "/rules.html" 
       
     },
     {
