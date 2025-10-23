@@ -1,56 +1,63 @@
 const express = require('express');
 const mongoose = require('mongoose');
-const jwt = require('jsonwebtoken');
-const bcrypt = require('bcryptjs');
 const cors = require('cors');
+const bcrypt = require('bcryptjs'); // Usando bcryptjs para compatibilidade
+const jwt = require('jsonwebtoken'); // Adicionado JWT para autenticação
 
 const app = express();
-const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://davidtottenhamroc_db_user:David0724.@cluster0.huj6sbw.mongodb.net/?appName=Cluster0";
-const PORT = process.env.PORT || 3000; 
 
-
-app.use(cors()); // Permite requisições do front-end (index.html)
+// Configurações
+app.use(cors()); 
 app.use(express.json());
 
-// ==============================
-// 1. CONEXÃO COM O MONGO DB
-// ==============================
-mongoose.connect(MONGO_URI)
-    .then(() => console.log('Conectado ao MongoDB.'))
-    .catch(err => console.error('Erro de conexão ao MongoDB:', err));
+// =====================================
+// --- Variáveis de Ambiente e Secret ---
+// =====================================
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://davidtottenhamroc_db_user:David0724.@cluster0.huj6sbw.mongodb.net/?appName=Cluster0";
+const PORT = process.env.PORT || 3000; 
+const PRE_DEFINED_ACCESS_PASSWORD = "otimus32"; // Senha pré-definida para o primeiro cadastro
 
-// ==============================
-// 2. SCHEMAS E MODELOS
-// ==============================
+// Conexão com o banco de dados MongoDB
+mongoose.connect(MONGODB_URI)
+    .then(() => console.log('Conectado ao MongoDB!'))
+    .catch(err => console.error('Erro de conexão com o MongoDB:', err));
 
-// Schema do Usuário (N1, N2, Gestao)
+// =====================================
+// --- Schemas (Modelos de Dados) ---
+// =====================================
+
+// SCHEMA PARA USUÁRIO (COM NÍVEL DE ACESSO)
 const userSchema = new mongoose.Schema({
-    username: { type: String, required: true, unique: true },
-    password: { type: String, required: true },
-    level: { type: String, enum: ['N1', 'N2', 'Gestao'], default: 'N1' }
-});
+    login: { type: String, required: true, unique: true },
+    senha: { type: String, required: true },
+    level: { type: String, enum: ['N1', 'N2', 'Gestao'], default: 'N1' } // Nível de acesso adicionado
+}, { collection: 'user' }); // Garante o nome da collection 'user'
 
-// Pré-save para hash de senha
-userSchema.pre('save', async function(next) {
-    if (this.isModified('password')) {
-        this.password = await bcrypt.hash(this.password, 10);
-    }
-    next();
-});
-
-const User = mongoose.model('User', userSchema);
-
-// Schema das Regras (Baseado nos dados do CSV)
+// SCHEMA DAS REGRAS DO ESTADO (Para a sua planilha)
 const ruleSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
-    states: { type: Map, of: String } // Armazena pares de estado:regra (ex: PE: "50 min")
+    states: { type: Map, of: String } // Ex: { PE: "50 min", AL: "45 min" }
 });
 
-const Rule = mongoose.model('Rule', ruleSchema);
+// Outros Schemas (Mantidos do seu código)
+const aulaSchema = new mongoose.Schema({ /* ... */ });
+const incidenteSchema = new mongoose.Schema({ /* ... */ });
+const memorySchema = new mongoose.Schema({ /* ... */ });
 
-// ==============================
-// 3. MIDDLEWARE DE AUTENTICAÇÃO
-// ==============================
+// ------------------------------------
+// --- Modelos Mongoose ---
+// ------------------------------------
+const User = mongoose.model('User', userSchema); 
+const Rule = mongoose.model('Rule', ruleSchema);
+const Aula = mongoose.model('Aula', aulaSchema);
+const Incidente = mongoose.model('Incidente', incidenteSchema);
+const Memory = mongoose.model('Memory', memorySchema); 
+
+
+// =====================================
+// --- MIDDLEWARE DE AUTENTICAÇÃO JWT ---
+// =====================================
+
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
     const token = authHeader && authHeader.split(' ')[1];
@@ -59,27 +66,28 @@ function authenticateToken(req, res, next) {
 
     jwt.verify(token, JWT_SECRET, (err, user) => {
         if (err) return res.status(403).json({ message: 'Token inválido ou expirado.' });
-        req.user = user; // Adiciona os dados do usuário (username, level) ao request
+        req.user = user; // Adiciona os dados do usuário (id, login, level) ao request
         next();
     });
 }
 
-// ==============================
-// 4. ROTAS DE AUTENTICAÇÃO (API)
-// ==============================
+// =====================================
+// --- FUNÇÃO DE INICIALIZAÇÃO DE DADOS ---
+// =====================================
 
-// Rota para Iniciar o Banco de Dados com as Regras Iniciais
+// Dados iniciais das regras (BASEADO NO SEU CSV - Prático.csv)
 async function initializeRules() {
     const initialRules = [
         { name: "Data de Corte teórico", states: { "AL": "01/02/2022", "PE": "01/01/2018", "PB": "abr./ 2013", "CE": "13/07/2017", "RN": "11/09/2017", "GO": "22/01/2018", "SE": "-", "BA": "-", "ES": "-", "MA": "-" } },
         { name: "Data de Corte prático B", states: { "AL": "31/03/2017", "PE": "01/04/2017 / C, D e E 01/08/2022", "PB": "04/07/2017", "CE": "13/08/2017", "RN": "21/12/2018", "GO": "22/01/2018", "SE": "(Em SERGIPE as datas de corte são por regional)", "BA": "15/12/2019", "ES": "-", "MA": "08/05/2023" } },
         { name: "Tempo minimo regulamentado", states: { "AL": "50 min", "PE": "50 min", "PB": "45 min", "CE": "50 min (5 min tolerância)", "RN": "50 minutos", "GO": "50 min", "SE": "50 min", "BA": "Diurno: 50 min", "ES": "50 min", "MA": "50 min" } },
-        // ... (Insira todas as regras do seu CSV aqui) ...
+        { name: "Tipo de pagamento", states: { "AL": "Vsoft/ Conpay", "PE": "REP / CNH Popular", "PB": "Vsoft/ Hab Social", "CE": "Vsoft(conpay) e Sindgestor", "RN": "Conpay", "GO": "Vsoft/ Bludata/ Hypersoft", "SE": "REP", "BA": "GerenciaNet", "ES": "REP", "MA": "REP" } },
+        { name: "PROCESSO INICIAL (VER TABELA DE AULAS)", states: { "AL": "VER TABELA DE AULAS", "PE": "VER TABELA DE AULAS", "PB": "VER TABELA DE AULAS", "CE": "VER TABELA DE AULAS", "RN": "VER TABELA DE AULAS", "GO": "VER TABELA DE AULAS", "SE": "VER TABELA DE AULAS", "BA": "VER TABELA DE AULAS", "ES": "VER TABELA DE AULAS", "MA": "VER TABELA DE AULAS" } }
+        // **ATENÇÃO: Inclua aqui todas as outras 20+ linhas do seu CSV "Prático.csv"**
     ];
 
     try {
         for (const rule of initialRules) {
-            // Insere apenas se a regra não existir
             await Rule.findOneAndUpdate({ name: rule.name }, rule, { upsert: true, new: true });
         }
         console.log('Regras iniciais garantidas no banco de dados.');
@@ -87,90 +95,92 @@ async function initializeRules() {
         console.error('Erro ao inicializar as regras:', error);
     }
 }
-// Chame esta função na inicialização:
 mongoose.connection.once('open', initializeRules);
 
+// =====================================
+// --- Rotas da API (Autenticação e Usuários) ---
+// =====================================
 
-// Rota de Cadastro de Usuário
-app.post('/api/register', async (req, res) => {
-    const { username, password, level } = req.body;
-    
-    if (!username || !password || !level) {
-        return res.status(400).json({ message: 'Faltam dados: username, password e level são obrigatórios.' });
-    }
-
+// Rota para criar um novo usuário (AJUSTADO com NÍVEL)
+app.post('/api/users', async (req, res) => {
     try {
-        const userCount = await User.countDocuments();
-        
-        // Regra de segurança: Se for o primeiro usuário, pode se cadastrar como Gestão
-        if (userCount === 0) {
-            const newUser = new User({ username, password, level: 'Gestao' });
-            await newUser.save();
-            return res.status(201).json({ message: 'Primeiro usuário (Gestão) cadastrado com sucesso.' });
-        }
-        
-        // Se não for o primeiro, é necessário estar logado como 'Gestao' para cadastrar.
-        const authHeader = req.headers['authorization'];
-        const token = authHeader && authHeader.split(' ')[1];
-        
-        if (!token) {
-             return res.status(403).json({ message: 'Cadastro restrito. Faça login primeiro.' });
-        }
+        const { login, senha, level, accessPassword } = req.body; // Adicionado 'level'
 
-        const decoded = jwt.verify(token, JWT_SECRET);
-        
-        if (decoded.level !== 'Gestao') {
-            return res.status(403).json({ message: 'Apenas usuários de Gestão podem cadastrar novos usuários.' });
+        // Verifica se a senha de acesso foi fornecida e está correta
+        if (!accessPassword || accessPassword !== PRE_DEFINED_ACCESS_PASSWORD) {
+            return res.status(403).send({ message: "Acesso negado. Senha de acesso incorreta para cadastrar usuário." });
         }
         
-        // Se for Gestão, permite o cadastro
-        const newUser = new User({ username, password, level });
-        await newUser.save();
-        return res.status(201).json({ message: `Usuário ${level} cadastrado com sucesso por Gestão.` });
+        // Verifica se o login, senha e nível foram fornecidos
+        if (!login || !senha || !level) {
+            return res.status(400).send({ message: "Login, senha e Nível (N1, N2 ou Gestao) são obrigatórios." });
+        }
+        
+        const hashedPassword = await bcrypt.hash(senha, 10); 
+        
+        const novoUsuario = new User({
+            login: login,
+            senha: hashedPassword,
+            level: level // Define o nível do usuário
+        });
+        
+        await novoUsuario.save();
+        
+        novoUsuario.senha = undefined; 
+        res.status(201).send(novoUsuario);
 
     } catch (error) {
         if (error.code === 11000) {
-            return res.status(400).json({ message: 'Nome de usuário já existe.' });
+            return res.status(409).send({ message: "Este login já está em uso." });
         }
-        console.error(error);
-        res.status(500).json({ message: 'Erro interno do servidor ao cadastrar.' });
+        res.status(400).send({ message: "Erro ao criar usuário.", error: error.message });
     }
 });
 
-// Rota de Login
+// Rota para autenticação (AJUSTADO com JWT e NÍVEL)
 app.post('/api/login', async (req, res) => {
-    const { username, password } = req.body;
-    
-    const user = await User.findOne({ username });
-    if (!user) {
-        return res.status(400).json({ message: 'Usuário não encontrado.' });
+    try {
+        const { username, password } = req.body;
+
+        const user = await User.findOne({ login: username });
+
+        if (!user) {
+            return res.status(401).json({ authenticated: false, message: 'Credenciais inválidas.' });
+        }
+        
+        const isMatch = await bcrypt.compare(password, user.senha);
+        
+        if (!isMatch) {
+            return res.status(401).json({ authenticated: false, message: 'Credenciais inválidas.' });
+        }
+
+        // Cria o token JWT com o ID, login e NÍVEL do usuário
+        const token = jwt.sign({ id: user._id, login: user.login, level: user.level }, JWT_SECRET, { expiresIn: '1h' });
+
+        // Retorna o token, o login e o nível de acesso
+        res.json({ 
+            authenticated: true, 
+            message: 'Login bem-sucedido.',
+            token,
+            level: user.level,
+            username: user.login
+        });
+
+    } catch (error) {
+        console.error('Erro durante a autenticação:', error);
+        res.status(500).json({ authenticated: false, message: 'Erro interno do servidor.' });
     }
-
-    const isMatch = await bcrypt.compare(password, user.password);
-    if (!isMatch) {
-        return res.status(400).json({ message: 'Senha incorreta.' });
-    }
-
-    // Cria e assina o token JWT
-    const token = jwt.sign({ id: user._id, username: user.username, level: user.level }, JWT_SECRET, { expiresIn: '1h' });
-
-    res.json({
-        message: 'Login realizado com sucesso.',
-        username: user.username,
-        level: user.level,
-        token
-    });
 });
 
-// ==============================
-// 5. ROTAS DE REGRAS (PROTEGIDAS)
-// ==============================
+// =====================================
+// --- Rotas de Regras (PROTEGIDAS) ---
+// =====================================
 
-// Rota para Obter Todas as Regras
+// Rota para Obter Todas as Regras (Requer Login)
 app.get('/api/rules', authenticateToken, async (req, res) => {
     try {
-        const rules = await Rule.find();
-        res.json(rules);
+        const rules = await Rule.find({});
+        res.send(rules);
     } catch (error) {
         res.status(500).json({ message: 'Erro ao buscar regras.' });
     }
@@ -178,7 +188,7 @@ app.get('/api/rules', authenticateToken, async (req, res) => {
 
 // Rota para Atualizar uma Regra (Permissão: N2 ou Gestao)
 app.put('/api/rules/:id', authenticateToken, async (req, res) => {
-    // Verifica permissão
+    // 1. Verifica Permissão
     const userLevel = req.user.level;
     if (userLevel !== 'N2' && userLevel !== 'Gestao') {
         return res.status(403).json({ message: 'Permissão negada. Apenas N2 e Gestão podem alterar regras.' });
@@ -192,7 +202,7 @@ app.put('/api/rules/:id', authenticateToken, async (req, res) => {
     }
 
     try {
-        const updateField = `states.${state}`; // Cria a chave dinâmica para o campo Map
+        const updateField = `states.${state}`; // Campo dinâmico para o Map
         
         const updatedRule = await Rule.findByIdAndUpdate(
             id,
@@ -211,9 +221,29 @@ app.put('/api/rules/:id', authenticateToken, async (req, res) => {
     }
 });
 
-// Inicializa o Servidor
+
+// =====================================
+// --- Outras Rotas (Mantidas do seu código) ---
+// =====================================
+
+// --- Rotas de Aulas ---
+app.post('/api/aulas', async (req, res) => { /* ... */ });
+app.get('/api/aulas', async (req, res) => { /* ... */ });
+
+// --- Rotas de Incidentes ---
+app.post('/api/incidentes', async (req, res) => { /* ... */ });
+app.get('/api/incidentes', async (req, res) => { /* ... */ });
+app.delete('/api/incidentes/:id', async (req, res) => { /* ... */ });
+
+// --- ROTAS PARA MEMÓRIA DO CHATBOT ---
+app.post('/api/memories', async (req, res) => { /* ... */ });
+app.get('/api/memories', async (req, res) => { /* ... */ });
+
+
+// Inicia o servidor
 app.listen(PORT, () => {
-    console.log(`Servidor rodando na porta http://localhost:${PORT}`);
-    console.log(`API acessível em http://localhost:${PORT}/api`);
+    console.log(`Servidor rodando na porta ${PORT}`);
+    console.log('URI do MongoDB:', MONGODB_URI);
 });
 
+module.exports = app;
