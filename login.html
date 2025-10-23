@@ -134,57 +134,58 @@
         </p>
     </div>
 
-    <script>
-        // **IMPORTANTE: Mantenha a URL do seu servidor Node.js aqui**
-        const API_BASE_URL = 'http://localhost:3000/api'; 
+   <script>
+    // **IMPORTANTE: Mantenha a URL do seu servidor Node.js aqui**
+    const API_BASE_URL = 'https://regras-vert.vercel.app/'; 
 
-        document.addEventListener('DOMContentLoaded', () => {
-             // Redireciona se o usuário já estiver logado
-            if (localStorage.getItem('session')) {
+    document.addEventListener('DOMContentLoaded', () => {
+         // Redireciona se o usuário já estiver logado (verifica a sessão simplificada)
+        if (localStorage.getItem('session')) {
+            window.location.href = 'rules.html';
+            return;
+        }
+    });
+
+    document.getElementById('login-form').addEventListener('submit', async (e) => {
+        e.preventDefault();
+
+        const username = document.getElementById('username').value;
+        const password = document.getElementById('password').value;
+        const errorMessage = document.getElementById('error-message');
+
+        errorMessage.style.display = 'none';
+
+        try {
+            const response = await fetch(`${API_BASE_URL}/login`, {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ username, password })
+            });
+
+            const data = await response.json();
+
+            if (response.ok && data.authenticated) {
+                // 1. Armazena os dados da sessão (agora SEM o token)
+                const sessionData = {
+                    currentUser: data.username,
+                    currentLevel: data.level,
+                    // authToken removido
+                };
+                localStorage.setItem('session', JSON.stringify(sessionData));
+                
+                // 2. Redireciona para a tela de regras
                 window.location.href = 'rules.html';
-                return;
-            }
-        });
-
-        document.getElementById('login-form').addEventListener('submit', async (e) => {
-            e.preventDefault();
-
-            const username = document.getElementById('username').value;
-            const password = document.getElementById('password').value;
-            const errorMessage = document.getElementById('error-message');
-
-            errorMessage.style.display = 'none';
-
-            try {
-                const response = await fetch(`${API_BASE_URL}/login`, {
-                    method: 'POST',
-                    headers: { 'Content-Type': 'application/json' },
-                    body: JSON.stringify({ username, password })
-                });
-
-                const data = await response.json();
-
-                if (response.ok && data.authenticated) {
-                    // 1. Armazena os dados da sessão (incluindo token e level)
-                    const sessionData = {
-                        currentUser: data.username,
-                        currentLevel: data.level,
-                        authToken: data.token
-                    };
-                    localStorage.setItem('session', JSON.stringify(sessionData));
-                    
-                    // 2. Redireciona para a tela de regras
-                    window.location.href = 'rules.html';
-                } else {
-                    errorMessage.textContent = data.message || 'Usuário ou senha incorretos.';
-                    errorMessage.style.display = 'block';
-                }
-            } catch (error) {
-                console.error('Erro:', error);
-                errorMessage.textContent = 'Erro ao conectar com o servidor. Tente novamente mais tarde.';
+            } else {
+                errorMessage.textContent = data.message || 'Usuário ou senha incorretos.';
                 errorMessage.style.display = 'block';
             }
-        });
-    </script>
+        } catch (error) {
+            console.error('Erro:', error);
+            errorMessage.textContent = 'Erro ao conectar com o servidor. Tente novamente mais tarde.';
+            errorMessage.style.display = 'block';
+        }
+    });
+</script>
 </body>
 </html>
+
