@@ -14,7 +14,7 @@ app.use(express.json());
 // =====================================
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://davidtottenhamroc_db_user:David0724.@cluster0.huj6sbw.mongodb.net/?appName=Cluster0";
 const PORT = process.env.PORT || 3000; 
-const PRE_DEFINED_ACCESS_PASSWORD = "otimus32"; // Senha pré-definida para o cadastro
+const PRE_DEFINED_ACCESS_PASSWORD = "otimus32"; 
 
 // Conexão com o banco de dados MongoDB
 mongoose.connect(MONGODB_URI)
@@ -25,11 +25,11 @@ mongoose.connect(MONGODB_URI)
 // --- Schemas (Modelos de Dados) ---
 // =====================================
 
-// 1. SCHEMA PARA USUÁRIO (AGORA COM O CAMPO 'LEVEL' CORRIGIDO)
+// 1. SCHEMA PARA USUÁRIO (COM O CAMPO 'LEVEL' CORRIGIDO)
 const userSchema = new mongoose.Schema({
     login: { type: String, required: true, unique: true },
     senha: { type: String, required: true },
-    level: { type: String, enum: ['N1', 'N2', 'Gestao'], default: 'N1' } // CAMPO CRUCIAL CORRIGIDO
+    level: { type: String, enum: ['N1', 'N2', 'Gestao'], default: 'N1' } 
 }, { collection: 'user' }); 
 
 // 2. SCHEMA DAS REGRAS DO ESTADO
@@ -44,18 +44,14 @@ const ruleSchema = new mongoose.Schema({
 const User = mongoose.model('User', userSchema); 
 const Rule = mongoose.model('Rule', ruleSchema);
 
-
 // =====================================
-// --- MIDDLEWARE DE AUTENTICAÇÃO SIMPLIFICADA (NÃO SEGURA) ---
+// --- MIDDLEWARE DE AUTENTICAÇÃO SIMPLIFICADA ---
 // =====================================
 
 function authenticateSimplificado(req, res, next) {
-    // O nível é enviado pelo Front-end no cabeçalho customizado (X-User-Level)
     if (!req.headers['x-user-level']) { 
          return res.status(401).json({ message: 'Acesso negado. Informações de sessão não fornecidas.' });
     }
-
-    // Adiciona o nível do usuário ao objeto req
     req.user = { level: req.headers['x-user-level'] }; 
     next();
 }
@@ -65,7 +61,6 @@ function authenticateSimplificado(req, res, next) {
 // =====================================
 
 async function initializeRules() {
-    // **NOTA: Os dados da planilha serão inseridos ou atualizados aqui.**
     const initialRules = [
         { name: "Data de Corte teórico", states: { "AL": "01/02/2022", "PE": "01/01/2018", "PB": "abr./ 2013", "CE": "13/07/2017", "RN": "11/09/2017", "GO": "22/01/2018", "SE": "-", "BA": "-", "ES": "-", "MA": "-" } },
         { name: "Data de Corte prático B", states: { "AL": "31/03/2017", "PE": "01/04/2017 / C, D e E 01/08/2022", "PB": "04/07/2017", "CE": "13/08/2017", "RN": "21/12/2018", "GO": "22/01/2018", "SE": "(Em SERGIPE as datas de corte são por regional)", "BA": "15/12/2019", "ES": "-", "MA": "08/05/2023" } },
@@ -90,7 +85,7 @@ mongoose.connection.once('open', initializeRules);
 // --- Rotas da API (Autenticação e Usuários) ---
 // =====================================
 
-// Rota para criar um novo usuário (CORRIGIDA PARA FUNCIONAR)
+// Rota para criar um novo usuário
 app.post('/api/users', async (req, res) => {
     try {
         const { login, senha, level, accessPassword } = req.body; 
@@ -105,7 +100,7 @@ app.post('/api/users', async (req, res) => {
         
         const hashedPassword = await bcrypt.hash(senha, 10); 
         
-        const novoUsuario = new User({ login, senha: hashedPassword, level }); // O level é salvo aqui
+        const novoUsuario = new User({ login, senha: hashedPassword, level }); 
         
         await novoUsuario.save();
         
@@ -116,13 +111,12 @@ app.post('/api/users', async (req, res) => {
         if (error.code === 11000) {
             return res.status(409).send({ message: "Este login já está em uso." });
         }
-        // ERRO QUE ESTAVA DANDO NO BACK-END
         console.error('Erro ao cadastrar usuário:', error); 
         res.status(500).send({ message: "Erro interno do servidor ao cadastrar.", error: error.message });
     }
 });
 
-// Rota de Login (CORRIGIDA PARA RETORNAR LEVEL)
+// Rota de Login 
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -139,7 +133,7 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ authenticated: false, message: 'Credenciais inválidas.' });
         }
 
-        // RETORNA O NÍVEL DE ACESSO
+        // Retorna o nível de acesso
         res.json({ 
             authenticated: true, 
             message: 'Login bem-sucedido.',
@@ -154,10 +148,10 @@ app.post('/api/login', async (req, res) => {
 });
 
 // =====================================
-// --- Rotas de Regras (PROTEGIDAS PELA SESSÃO SIMPLIFICADA) ---
+// --- Rotas de Regras (PROTEGIDAS) ---
 // =====================================
 
-// Rota para Obter Todas as Regras (Requer Login)
+// Rota para Obter Todas as Regras
 app.get('/api/rules', authenticateSimplificado, async (req, res) => {
     try {
         const rules = await Rule.find({});
@@ -167,9 +161,8 @@ app.get('/api/rules', authenticateSimplificado, async (req, res) => {
     }
 });
 
-// Rota para Atualizar uma Regra (Permissão: N2 ou Gestao)
+// Rota para Atualizar uma Regra
 app.put('/api/rules/:id', authenticateSimplificado, async (req, res) => {
-    // 1. Verifica Permissão baseada no header 'X-User-Level'
     const userLevel = req.user.level; 
     if (userLevel !== 'N2' && userLevel !== 'Gestao') {
         return res.status(403).json({ message: 'Permissão negada. Apenas N2 e Gestão podem alterar regras.' });
