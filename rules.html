@@ -6,7 +6,6 @@
     <title>Painel de Regras dos Estados</title>
     
     <style>
-        /* ... (CSS Omitido) ... */
         body {
             font-family: Arial, sans-serif;
             background-color: #f4f4f4;
@@ -156,7 +155,7 @@
     </div>
 
     <script>
-    // URL base é vazia para usar o caminho relativo /api/ (funciona se o roteamento Vercel estiver correto)
+    // ** API_BASE_URL vazia para usar o caminho relativo /api/ (requer vercel.json) **
     const API_BASE_URL = ''; 
     
     // VARIÁVEIS GLOBAIS DE ESTADO (SEM TOKEN)
@@ -172,14 +171,14 @@
     const statusMessage = document.getElementById('status-message');
 
 
-    // FUNÇÃO DE FEEDBACK VISUAL (CORRIGIDA E ADICIONADA AQUI)
+    // FUNÇÃO DE FEEDBACK VISUAL
     function showMessage(element, message, type = 'error', duration = 3000) {
         element.textContent = message;
         element.classList.remove('hidden', 'success', 'error');
         element.classList.add(type);
         setTimeout(() => element.classList.add('hidden'), duration);
     }
-
+    
     function updateAuthDisplay() {
         if (currentUser && currentLevel) {
             mainSystem.classList.remove('hidden');
@@ -215,13 +214,14 @@
     }
 
 
-    // --- 2. RENDERIZAÇÃO E EDIÇÃO DA TABELA (AJUSTADO PARA USAR HEADER SIMPLIFICADO) ---
+    // --- 2. RENDERIZAÇÃO E EDIÇÃO DA TABELA ---
 
     async function renderRulesTable() {
         try {
-            // Requisição com caminho relativo
+            // Requisição usando o caminho relativo "/api/rules"
             const response = await fetch(`${API_BASE_URL}/api/rules`, {
                 headers: { 
+                    // O Back-end checa esta informação
                     'X-User-Level': currentLevel 
                 }
             });
@@ -241,6 +241,7 @@
                 : STATES;
 
             // 1. Renderiza o cabeçalho
+            const tableHeader = document.getElementById('table-header');
             tableHeader.innerHTML = '';
             allowedStates.forEach(state => {
                 const th = document.createElement('th');
@@ -249,6 +250,7 @@
             });
 
             // 2. Renderiza o corpo
+            const tableBody = document.getElementById('table-body');
             tableBody.innerHTML = '';
             const isEditable = currentLevel === 'N2' || currentLevel === 'Gestao';
             
@@ -281,6 +283,7 @@
 
         } catch (error) {
             console.error('Erro ao renderizar tabela:', error);
+            const statusMessage = document.getElementById('status-message');
             showMessage(statusMessage, 'Erro ao carregar as regras. Verifique a conexão com o servidor.', 'error', 10000);
         }
     }
@@ -290,6 +293,7 @@
         const ruleId = td.dataset.ruleId;
         const stateKey = td.dataset.stateKey;
         const originalValue = td.textContent;
+        const statusMessage = document.getElementById('status-message');
 
         if (td.querySelector('textarea')) return;
 
