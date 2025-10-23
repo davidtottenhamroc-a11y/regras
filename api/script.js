@@ -15,6 +15,8 @@ app.use(express.json());
 // =====================================
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://davidtottenhamroc_db_user:David0724.@cluster0.huj6sbw.mongodb.net/?appName=Cluster0";
 const PORT = process.env.PORT || 3000; 
+// *** CORREÇÃO AQUI: JWT_SECRET é essencial para o token ***
+const JWT_SECRET = process.env.JWT_SECRET || 'David0724.'; 
 const PRE_DEFINED_ACCESS_PASSWORD = "otimus32"; // Senha pré-definida para o primeiro cadastro
 
 // Conexão com o banco de dados MongoDB
