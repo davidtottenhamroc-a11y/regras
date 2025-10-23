@@ -5,7 +5,7 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>Cadastro - VSoft</title>
     <style>
-        /* CSS Ocultado para brevidade - Assumido ser o mesmo */
+        /* ... (CSS Omitido) ... */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -160,9 +160,6 @@
     </div>
 
     <script>
-        // *** URL CORRIGIDA PARA O SEU SERVIDOR VERCEL ***
-        const API_BASE_URL = 'https://regras-vert.vercel.app/api'; 
-
         function showMessage(element, message, type = 'error', duration = 3000) {
             element.textContent = message;
             element.classList.remove('error', 'success');
@@ -182,8 +179,8 @@
             messageElement.style.display = 'none'; 
 
             try {
-                // *** USO OBRIGATÓRIO DO API_BASE_URL ***
-                const response = await fetch(`${API_BASE_URL}/users`, {
+                // *** REQUISIÇÃO RELATIVA: FUNCIONA SE O ROUTING DA VERCEL ESTIVER CORRETO ***
+                const response = await fetch('/api/users', { 
                     method: 'POST',
                     headers: { 'Content-Type': 'application/json' },
                     body: JSON.stringify({ login, senha, level, accessPassword })
@@ -193,7 +190,6 @@
                 try {
                     data = await response.json();
                 } catch (e) {
-                    // Resposta não JSON (muito comum em erro 500 ou time-out na Vercel)
                     console.error("Erro: Resposta não é JSON. Status:", response.status);
                     throw new Error(`Erro do Servidor (Status ${response.status}). Verifique o log do Vercel.`);
                 }
@@ -202,17 +198,14 @@
                     document.getElementById('register-form').reset();
                     showMessage(messageElement, data.message || `Usuário ${login} (${level}) cadastrado com sucesso!`, 'success');
                     
-                    // Redireciona para o login após sucesso
                     setTimeout(() => {
                         window.location.href = 'login.html';
                     }, 2000);
                 } else {
-                    // Trata erros HTTP (400, 403, 409) com a mensagem retornada pelo back-end
                     showMessage(messageElement, data.message || `Erro de cadastro. Código: ${response.status}.`, 'error');
                 }
             } catch (error) {
                 console.error('Erro de conexão/API:', error);
-                // Erro de conexão ou a mensagem de erro que lançamos
                 showMessage(messageElement, error.message || 'Erro de conexão com o servidor. Verifique se o Back-end está ativo.', 'error');
             }
         });
