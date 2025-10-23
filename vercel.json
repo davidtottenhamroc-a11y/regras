@@ -1,33 +1,8 @@
 {
   "rewrites": [
-
-    {
-      "source": "/",
-      "destination": "/login.html" 
-      
-    },
-    {
-      "source": "/",
-      "destination": "/register.html" 
-      
-    },
-    {
-      "source": "/",
-      "destination": "/rules.html" 
-      
-    },
     {
       "source": "/api/(.*)",
-      "destination": "/api/script.js"
-    },
-    
-    {
-      "source": "/(.*)\\.html",
-      "destination": "/$1.html"
-    },
-    {
-      "source": "/(.*)",
-      "destination": "/$1"
+      "destination": "/server.js"
     }
   ]
 }
