@@ -5,9 +5,9 @@ const bcrypt = require('bcryptjs');
 const cors = require('cors');
 
 const app = express();
-const PORT = 3000;
-const MONGO_URI = 'mongodb://localhost:27017/regrasdb'; // Mude para sua URI do Mongo
-const JWT_SECRET = 'sua_chave_secreta_aqui'; // Mude para uma chave secreta forte
+const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://davidtottenhamroc_db_user:David0724.@cluster0.huj6sbw.mongodb.net/?appName=Cluster0";
+const PORT = process.env.PORT || 3000; 
+
 
 app.use(cors()); // Permite requisições do front-end (index.html)
 app.use(express.json());
@@ -216,3 +216,4 @@ app.listen(PORT, () => {
     console.log(`Servidor rodando na porta http://localhost:${PORT}`);
     console.log(`API acessível em http://localhost:${PORT}/api`);
 });
+
