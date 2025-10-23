@@ -155,226 +155,171 @@
     </div>
 
     <script>
-        // **IMPORTANTE: Mantenha a URL do seu servidor Node.js aqui**
-        const API_BASE_URL = 'http://localhost:3000/api'; 
-        
-        // VARIÁVEIS GLOBAIS DE ESTADO
-        let currentUser = null;
-        let currentLevel = null;
-        let authToken = null; 
+    // **IMPORTANTE: Mantenha a URL do seu servidor Node.js aqui**
+    const API_BASE_URL = 'https://regras-vert.vercel.app/'; 
+    
+    // VARIÁVEIS GLOBAIS DE ESTADO (SEM TOKEN)
+    let currentUser = null;
+    let currentLevel = null;
+    
+    const STATES = ["DADOS DA REGRA", "AL", "PE", "PB", "CE", "RN", "GO", "SE", "BA", "ES", "MA"];
+    
+    // ... (Elementos DOM e funções showMessage/updateAuthDisplay/handleLogout iguais) ...
 
-        const STATES = ["DADOS DA REGRA", "AL", "PE", "PB", "CE", "RN", "GO", "SE", "BA", "ES", "MA"];
-        
-        // Elementos DOM
-        const tableBody = document.getElementById('table-body');
-        const tableHeader = document.getElementById('table-header');
-        const mainSystem = document.getElementById('main-system');
-        const logoutButton = document.getElementById('logout-button');
-        const statusMessage = document.getElementById('status-message');
-
-        // --- 1. FUNÇÕES DE UTILIDADE E UI ---
-
-        function showMessage(element, message, type = 'error', duration = 3000) {
-            element.textContent = message;
-            element.classList.remove('hidden', 'success', 'error');
-            element.classList.add(type);
-            setTimeout(() => element.classList.add('hidden'), duration);
-        }
-
-        function updateAuthDisplay() {
-            if (currentUser && currentLevel) {
-                mainSystem.classList.remove('hidden');
-                document.getElementById('current-user').textContent = currentUser;
-                document.getElementById('current-level').textContent = currentLevel;
-                renderRulesTable();
-            } else {
-                // Se não houver sessão válida, redireciona para o login
-                window.location.href = 'login.html'; 
-            }
-        }
-        
-        function restoreSession() {
-            const session = localStorage.getItem('session');
-            if (session) {
-                try {
-                    const { currentUser: user, currentLevel: level, authToken: token } = JSON.parse(session);
-                    currentUser = user;
-                    currentLevel = level;
-                    authToken = token;
-                    updateAuthDisplay();
-                } catch (e) {
-                    // Limpa a sessão se for inválida
-                    localStorage.removeItem('session');
-                    updateAuthDisplay(); 
-                }
-            } else {
-                updateAuthDisplay();
-            }
-        }
-
-        function handleLogout() {
-            localStorage.removeItem('session');
-            window.location.href = 'login.html';
-        }
-
-
-        // --- 2. RENDERIZAÇÃO E EDIÇÃO DA TABELA ---
-
-        async function renderRulesTable() {
+    function restoreSession() {
+        const session = localStorage.getItem('session');
+        if (session) {
             try {
-                const response = await fetch(`${API_BASE_URL}/rules`, {
-                    headers: { 'Authorization': `Bearer ${authToken}` }
-                });
-
-                if (!response.ok) {
-                    // Se a busca falhar (token inválido/expirado), faz logout
-                    if (response.status === 401 || response.status === 403) {
-                        handleLogout();
-                        return;
-                    }
-                    throw new Error('Falha ao buscar as regras.');
-                }
-
-                const rulesData = await response.json();
-                
-                // Permissão: N1 só pode ver 'DADOS DA REGRA' e 'PE'.
-                const allowedStates = (currentLevel === 'N1') 
-                    ? STATES.filter(s => s === 'DADOS DA REGRA' || s === 'PE') 
-                    : STATES;
-
-                // 1. Renderiza o cabeçalho (Estados)
-                tableHeader.innerHTML = '';
-                allowedStates.forEach(state => {
-                    const th = document.createElement('th');
-                    th.textContent = state;
-                    tableHeader.appendChild(th);
-                });
-
-                // 2. Renderiza o corpo da tabela
-                tableBody.innerHTML = '';
-                const isEditable = currentLevel === 'N2' || currentLevel === 'Gestao';
-                
-                rulesData.forEach(rule => {
-                    const tr = document.createElement('tr');
-                    const ruleName = rule.name;
-                    
-                    allowedStates.forEach(state => {
-                        const td = document.createElement('td');
-                        
-                        if (state === 'DADOS DA REGRA') {
-                            td.textContent = ruleName;
-                            td.style.fontWeight = 'bold';
-                        } else {
-                            // Encontra o valor no Map 'states' do objeto rule
-                            const cellValue = rule.states[state] || '-'; 
-                            td.textContent = cellValue;
-                            
-                            // Células editáveis (N2 e Gestão)
-                            if (isEditable) {
-                                td.classList.add('rule-cell');
-                                td.dataset.ruleId = rule._id; // ID do MongoDB
-                                td.dataset.stateKey = state;
-                                td.addEventListener('click', handleCellClick);
-                            }
-                        }
-                        tr.appendChild(td);
-                    });
-                    tableBody.appendChild(tr);
-                });
-
-            } catch (error) {
-                console.error('Erro ao renderizar tabela:', error);
-                showMessage(statusMessage, 'Erro ao carregar as regras. Verifique a conexão com o servidor.', 'error', 10000);
+                // Recupera SEM o token
+                const { currentUser: user, currentLevel: level } = JSON.parse(session);
+                currentUser = user;
+                currentLevel = level;
+                updateAuthDisplay();
+            } catch (e) {
+                localStorage.removeItem('session');
+                updateAuthDisplay(); 
             }
+        } else {
+            updateAuthDisplay();
         }
+    }
 
-        function handleCellClick(event) {
-            const td = event.target;
-            const ruleId = td.dataset.ruleId;
-            const stateKey = td.dataset.stateKey;
-            const originalValue = td.textContent;
+    // --- 2. RENDERIZAÇÃO E EDIÇÃO DA TABELA (AJUSTADO PARA USAR HEADER SIMPLIFICADO) ---
 
-            if (td.querySelector('textarea')) return;
-
-            const textarea = document.createElement('textarea');
-            textarea.value = originalValue;
-            textarea.style.width = '100%';
-            textarea.style.minHeight = '50px';
-            textarea.style.boxSizing = 'border-box';
-
-            const saveButton = document.createElement('button');
-            saveButton.textContent = 'Salvar';
-            
-            const cancelButton = document.createElement('button');
-            cancelButton.textContent = 'Cancelar';
-            cancelButton.style.backgroundColor = '#6c757d';
-            cancelButton.style.marginLeft = '5px';
-
-            const buttonGroup = document.createElement('div');
-            buttonGroup.style.display = 'flex';
-            buttonGroup.style.marginTop = '5px';
-            buttonGroup.appendChild(saveButton);
-            buttonGroup.appendChild(cancelButton);
-
-            const finalizeEdit = (newValue = originalValue) => {
-                td.textContent = newValue;
-                td.removeChild(textarea);
-                td.removeChild(buttonGroup);
-                td.addEventListener('click', handleCellClick);
-            };
-
-            // Lógica de SALVAR (Comunicação com o Back-end)
-            saveButton.addEventListener('click', async () => {
-                const newValue = textarea.value.trim();
-                
-                try {
-                    const response = await fetch(`${API_BASE_URL}/rules/${ruleId}`, {
-                        method: 'PUT',
-                        headers: { 
-                            'Content-Type': 'application/json',
-                            'Authorization': `Bearer ${authToken}` // Envia o token para autorização
-                        },
-                        body: JSON.stringify({ state: stateKey, value: newValue })
-                    });
-
-                    const data = await response.json();
-
-                    if (response.ok) {
-                        finalizeEdit(newValue); 
-                        showMessage(statusMessage, `Regra atualizada com sucesso em ${stateKey}.`, 'success');
-                    } else {
-                        finalizeEdit(originalValue); 
-                        showMessage(statusMessage, data.message || 'Permissão negada ou erro ao salvar.', 'error');
-                    }
-                } catch (error) {
-                    console.error('Update error:', error);
-                    finalizeEdit(originalValue);
-                    showMessage(statusMessage, 'Erro de conexão com o servidor ao tentar salvar.', 'error');
+    async function renderRulesTable() {
+        try {
+            // ENVIANDO O NÍVEL DE ACESSO VIA HEADER CUSTOMIZADO
+            const response = await fetch(`${API_BASE_URL}/rules`, {
+                headers: { 
+                    'X-User-Level': currentLevel // Novo Header Simplificado
                 }
             });
+
+            if (!response.ok) {
+                if (response.status === 401 || response.status === 403) {
+                    handleLogout();
+                    return;
+                }
+                throw new Error('Falha ao buscar as regras.');
+            }
+
+            const rulesData = await response.json();
             
-            // Lógica de CANCELAR
-            cancelButton.addEventListener('click', () => {
-                finalizeEdit(originalValue);
-                statusMessage.classList.add('hidden');
+            // ... (Lógica de renderização da tabela igual, usando currentLevel para permissão) ...
+            
+            const allowedStates = (currentLevel === 'N1') 
+                ? STATES.filter(s => s === 'DADOS DA REGRA' || s === 'PE') 
+                : STATES;
+
+            // 1. Renderiza o cabeçalho
+            tableHeader.innerHTML = '';
+            allowedStates.forEach(state => {
+                const th = document.createElement('th');
+                th.textContent = state;
+                tableHeader.appendChild(th);
             });
 
-            // Substitui o conteúdo da célula pelos campos de edição
-            td.textContent = '';
-            td.removeEventListener('click', handleCellClick);
-            td.appendChild(textarea);
-            td.appendChild(buttonGroup);
-            textarea.focus();
+            // 2. Renderiza o corpo
+            tableBody.innerHTML = '';
+            const isEditable = currentLevel === 'N2' || currentLevel === 'Gestao';
+            
+            rulesData.forEach(rule => {
+                const tr = document.createElement('tr');
+                const ruleName = rule.name;
+                
+                allowedStates.forEach(state => {
+                    const td = document.createElement('td');
+                    
+                    if (state === 'DADOS DA REGRA') {
+                        td.textContent = ruleName;
+                        td.style.fontWeight = 'bold';
+                    } else {
+                        const cellValue = rule.states[state] || '-'; 
+                        td.textContent = cellValue;
+                        
+                        if (isEditable) {
+                            td.classList.add('rule-cell');
+                            td.dataset.ruleId = rule._id;
+                            td.dataset.stateKey = state;
+                            td.addEventListener('click', handleCellClick);
+                        }
+                    }
+                    tr.appendChild(td);
+                });
+                tableBody.appendChild(tr);
+            });
+
+
+        } catch (error) {
+            console.error('Erro ao renderizar tabela:', error);
+            showMessage(statusMessage, 'Erro ao carregar as regras. Verifique a conexão com o servidor.', 'error', 10000);
         }
+    }
 
-        // --- 4. EVENT LISTENERS E INICIALIZAÇÃO ---
+    function handleCellClick(event) {
+        // ... (Criação de textarea e botões igual) ...
+        const td = event.target;
+        const ruleId = td.dataset.ruleId;
+        const stateKey = td.dataset.stateKey;
+        const originalValue = td.textContent;
+        // ... (Criação de textarea, saveButton, cancelButton) ...
+        
+        const finalizeEdit = (newValue = originalValue) => {
+            td.textContent = newValue;
+            td.removeChild(textarea);
+            td.removeChild(buttonGroup);
+            td.addEventListener('click', handleCellClick);
+        };
 
-        document.addEventListener('DOMContentLoaded', () => {
-            restoreSession(); 
+        // Lógica de SALVAR (Comunicação com o Back-end)
+        saveButton.addEventListener('click', async () => {
+            const newValue = textarea.value.trim();
+            
+            try {
+                // ENVIANDO O NÍVEL DE ACESSO VIA HEADER CUSTOMIZADO
+                const response = await fetch(`${API_BASE_URL}/rules/${ruleId}`, {
+                    method: 'PUT',
+                    headers: { 
+                        'Content-Type': 'application/json',
+                        'X-User-Level': currentLevel // Novo Header Simplificado
+                    },
+                    body: JSON.stringify({ state: stateKey, value: newValue })
+                });
+
+                const data = await response.json();
+
+                if (response.ok) {
+                    finalizeEdit(newValue); 
+                    showMessage(statusMessage, `Regra atualizada com sucesso em ${stateKey}.`, 'success');
+                } else {
+                    finalizeEdit(originalValue); 
+                    showMessage(statusMessage, data.message || 'Permissão negada ou erro ao salvar.', 'error');
+                }
+            } catch (error) {
+                console.error('Update error:', error);
+                finalizeEdit(originalValue);
+                showMessage(statusMessage, 'Erro de conexão com o servidor ao tentar salvar.', 'error');
+            }
         });
+        
+        // ... (Lógica de Cancelar e anexar ao DOM igual) ...
+        
+        // Substitui o conteúdo da célula pelos campos de edição
+        td.textContent = '';
+        td.removeEventListener('click', handleCellClick);
+        td.appendChild(textarea);
+        td.appendChild(buttonGroup);
+        textarea.focus();
+    }
 
-        logoutButton.addEventListener('click', handleLogout);
+    // --- 4. EVENT LISTENERS E INICIALIZAÇÃO ---
 
-    </script>
+    document.addEventListener('DOMContentLoaded', () => {
+        restoreSession(); 
+    });
+
+    logoutButton.addEventListener('click', handleLogout);
+
+</script>
 </body>
 </html>
