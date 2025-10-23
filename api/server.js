@@ -2,7 +2,7 @@ const express = require('express');
 const mongoose = require('mongoose');
 const cors = require('cors');
 const bcrypt = require('bcryptjs'); // Usando bcryptjs para compatibilidade
-const jwt = require('jsonwebtoken'); // Adicionado JWT para autenticação
+// JWT e JWT_SECRET removidos
 
 const app = express();
 
@@ -15,8 +15,6 @@ app.use(express.json());
 // =====================================
 const MONGODB_URI = process.env.MONGODB_URI || "mongodb+srv://davidtottenhamroc_db_user:David0724.@cluster0.huj6sbw.mongodb.net/?appName=Cluster0";
 const PORT = process.env.PORT || 3000; 
-// *** CORREÇÃO AQUI: JWT_SECRET é essencial para o token ***
-const JWT_SECRET = process.env.JWT_SECRET || 'David0724.'; 
 const PRE_DEFINED_ACCESS_PASSWORD = "otimus32"; // Senha pré-definida para o primeiro cadastro
 
 // Conexão com o banco de dados MongoDB
@@ -28,17 +26,15 @@ mongoose.connect(MONGODB_URI)
 // --- Schemas (Modelos de Dados) ---
 // =====================================
 
-// SCHEMA PARA USUÁRIO (COM NÍVEL DE ACESSO)
 const userSchema = new mongoose.Schema({
     login: { type: String, required: true, unique: true },
     senha: { type: String, required: true },
-    level: { type: String, enum: ['N1', 'N2', 'Gestao'], default: 'N1' } // Nível de acesso adicionado
-}, { collection: 'user' }); // Garante o nome da collection 'user'
+    level: { type: String, enum: ['N1', 'N2', 'Gestao'], default: 'N1' }
+}, { collection: 'user' }); 
 
-// SCHEMA DAS REGRAS DO ESTADO (Para a sua planilha)
 const ruleSchema = new mongoose.Schema({
     name: { type: String, required: true, unique: true },
-    states: { type: Map, of: String } // Ex: { PE: "50 min", AL: "45 min" }
+    states: { type: Map, of: String }
 });
 
 // Outros Schemas (Mantidos do seu código)
@@ -57,27 +53,34 @@ const Memory = mongoose.model('Memory', memorySchema);
 
 
 // =====================================
-// --- MIDDLEWARE DE AUTENTICAÇÃO JWT ---
+// --- MIDDLEWARE DE AUTENTICAÇÃO SIMPLIFICADA (NÃO SEGURA) ---
 // =====================================
 
-function authenticateToken(req, res, next) {
-    const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+function authenticateSimplificado(req, res, next) {
+    // Para obter regras, precisamos apenas do login (o nível será verificado na rota PUT)
+    const { username, level } = req.body; 
+    
+    // NOTA: No GET, os dados de autenticação (username/level) virão do localStorage do cliente
+    // e devem ser passados via headers ou query params. Adaptando para aceitar no body
+    // para PUT, ou usar um método mais seguro como custom headers para GET.
+    
+    // Neste modelo simplificado, apenas verificamos se há um token (username)
+    // na requisição de regras (GET). O front-end é quem guarda a 'prova' de login.
+    if (!req.headers['x-user-level']) { 
+         // Se não for fornecido o header 'x-user-level', bloqueia (Simulando autenticação)
+         // O front-end será modificado para enviar este header.
+         return res.status(401).json({ message: 'Acesso negado. Informações de sessão não fornecidas.' });
+    }
 
-    if (token == null) return res.status(401).json({ message: 'Token não fornecido.' });
-
-    jwt.verify(token, JWT_SECRET, (err, user) => {
-        if (err) return res.status(403).json({ message: 'Token inválido ou expirado.' });
-        req.user = user; // Adiciona os dados do usuário (id, login, level) ao request
-        next();
-    });
+    // Adiciona as informações do usuário ao request (para checagem de permissão no PUT)
+    req.user = { level: req.headers['x-user-level'] }; 
+    next();
 }
 
 // =====================================
 // --- FUNÇÃO DE INICIALIZAÇÃO DE DADOS ---
 // =====================================
 
-// Dados iniciais das regras (BASEADO NO SEU CSV - Prático.csv)
 async function initializeRules() {
     const initialRules = [
         { name: "Data de Corte teórico", states: { "AL": "01/02/2022", "PE": "01/01/2018", "PB": "abr./ 2013", "CE": "13/07/2017", "RN": "11/09/2017", "GO": "22/01/2018", "SE": "-", "BA": "-", "ES": "-", "MA": "-" } },
@@ -103,28 +106,22 @@ mongoose.connection.once('open', initializeRules);
 // --- Rotas da API (Autenticação e Usuários) ---
 // =====================================
 
-// Rota para criar um novo usuário (AJUSTADO com NÍVEL)
+// Rota para criar um novo usuário
 app.post('/api/users', async (req, res) => {
     try {
-        const { login, senha, level, accessPassword } = req.body; // Adicionado 'level'
+        const { login, senha, level, accessPassword } = req.body; 
 
-        // Verifica se a senha de acesso foi fornecida e está correta
         if (!accessPassword || accessPassword !== PRE_DEFINED_ACCESS_PASSWORD) {
             return res.status(403).send({ message: "Acesso negado. Senha de acesso incorreta para cadastrar usuário." });
         }
         
-        // Verifica se o login, senha e nível foram fornecidos
         if (!login || !senha || !level) {
             return res.status(400).send({ message: "Login, senha e Nível (N1, N2 ou Gestao) são obrigatórios." });
         }
         
         const hashedPassword = await bcrypt.hash(senha, 10); 
         
-        const novoUsuario = new User({
-            login: login,
-            senha: hashedPassword,
-            level: level // Define o nível do usuário
-        });
+        const novoUsuario = new User({ login, senha: hashedPassword, level });
         
         await novoUsuario.save();
         
@@ -139,7 +136,7 @@ app.post('/api/users', async (req, res) => {
     }
 });
 
-// Rota para autenticação (AJUSTADO com JWT e NÍVEL)
+// Rota de Login (SEM JWT)
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
@@ -156,14 +153,10 @@ app.post('/api/login', async (req, res) => {
             return res.status(401).json({ authenticated: false, message: 'Credenciais inválidas.' });
         }
 
-        // Cria o token JWT com o ID, login e NÍVEL do usuário
-        const token = jwt.sign({ id: user._id, login: user.login, level: user.level }, JWT_SECRET, { expiresIn: '1h' });
-
-        // Retorna o token, o login e o nível de acesso
+        // Retorna o nível de acesso e o nome do usuário (NÃO retorna token)
         res.json({ 
             authenticated: true, 
             message: 'Login bem-sucedido.',
-            token,
             level: user.level,
             username: user.login
         });
@@ -175,11 +168,11 @@ app.post('/api/login', async (req, res) => {
 });
 
 // =====================================
-// --- Rotas de Regras (PROTEGIDAS) ---
+// --- Rotas de Regras (PROTEGIDAS PELA SESSÃO SIMPLIFICADA) ---
 // =====================================
 
 // Rota para Obter Todas as Regras (Requer Login)
-app.get('/api/rules', authenticateToken, async (req, res) => {
+app.get('/api/rules', authenticateSimplificado, async (req, res) => {
     try {
         const rules = await Rule.find({});
         res.send(rules);
@@ -189,9 +182,10 @@ app.get('/api/rules', authenticateToken, async (req, res) => {
 });
 
 // Rota para Atualizar uma Regra (Permissão: N2 ou Gestao)
-app.put('/api/rules/:id', authenticateToken, async (req, res) => {
+app.put('/api/rules/:id', authenticateSimplificado, async (req, res) => {
     // 1. Verifica Permissão
-    const userLevel = req.user.level;
+    // A permissão é baseada no 'level' que o front-end enviou no header 'x-user-level'
+    const userLevel = req.user.level; 
     if (userLevel !== 'N2' && userLevel !== 'Gestao') {
         return res.status(403).json({ message: 'Permissão negada. Apenas N2 e Gestão podem alterar regras.' });
     }
