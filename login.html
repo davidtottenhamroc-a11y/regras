@@ -3,9 +3,9 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Login - VSoft - Regras dos Estados</title>
+    <title>Login - VSoft</title>
     <style>
-        /* Seu CSS Existente (Melhorado para o padrão) */
+        /* Seu CSS Existente */
         * {
             box-sizing: border-box;
             margin: 0;
@@ -83,7 +83,7 @@
             cursor: pointer;
             font-weight: bold;
             transition: all 0.3s ease;
-            margin-top: 10px;
+            margin-top: 10px; /* Adicionado para separar do botão */
         }
         button:hover {
             background: linear-gradient(135deg, #218838, #1e7e34);
@@ -119,7 +119,7 @@
 
         <form id="login-form">
             <div class="form-group">
-                <label for="username">Usuário (Login):</label>
+                <label for="username">Usuário:</label>
                 <input type="text" id="username" name="username" required>
             </div>
             <div class="form-group">
@@ -128,64 +128,68 @@
             </div>
             <button type="submit">Entrar</button>
         </form>
-        <p class="error-message" id="error-message">Erro de autenticação.</p>
+        <p class="error-message" id="error-message">Usuário ou senha incorretos. Tente novamente.</p>
         <p class="register-link">
             Não tem conta? <a href="register.html">Cadastre-se aqui</a>
         </p>
     </div>
 
-   <script>
-    // **IMPORTANTE: Mantenha a URL do seu servidor Node.js aqui**
-    const API_BASE_URL = 'https://regras-vert.vercel.app/'; 
-
-    document.addEventListener('DOMContentLoaded', () => {
-         // Redireciona se o usuário já estiver logado (verifica a sessão simplificada)
-        if (localStorage.getItem('session')) {
-            window.location.href = 'rules.html';
-            return;
-        }
-    });
-
-    document.getElementById('login-form').addEventListener('submit', async (e) => {
-        e.preventDefault();
-
-        const username = document.getElementById('username').value;
-        const password = document.getElementById('password').value;
-        const errorMessage = document.getElementById('error-message');
-
-        errorMessage.style.display = 'none';
-
-        try {
-            const response = await fetch(`${API_BASE_URL}/login`, {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                body: JSON.stringify({ username, password })
-            });
-
-            const data = await response.json();
-
-            if (response.ok && data.authenticated) {
-                // 1. Armazena os dados da sessão (agora SEM o token)
-                const sessionData = {
-                    currentUser: data.username,
-                    currentLevel: data.level,
-                    // authToken removido
-                };
-                localStorage.setItem('session', JSON.stringify(sessionData));
-                
-                // 2. Redireciona para a tela de regras
+    <script>
+        // *** CORREÇÃO: Usando a URL da Vercel para comunicação BACK-END ***
+        const API_BASE_URL = 'https://regras-vert.vercel.app/api'; 
+        
+        document.addEventListener('DOMContentLoaded', () => {
+             // Redireciona se a sessão já estiver ativa (verifica o localStorage)
+            if (localStorage.getItem('session')) {
                 window.location.href = 'rules.html';
-            } else {
-                errorMessage.textContent = data.message || 'Usuário ou senha incorretos.';
+                return;
+            }
+        });
+
+        document.getElementById('login-form').addEventListener('submit', async (e) => {
+            e.preventDefault();
+
+            const username = document.getElementById('username').value;
+            const password = document.getElementById('password').value;
+            const errorMessage = document.getElementById('error-message');
+
+            // Oculta a mensagem de erro antes de uma nova tentativa
+            errorMessage.style.display = 'none';
+
+            try {
+                // Requisição usando o API_BASE_URL completo
+                const response = await fetch(`${API_BASE_URL}/login`, {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                    },
+                    body: JSON.stringify({ username, password })
+                });
+
+                const data = await response.json();
+
+                if (response.ok && data.authenticated) {
+                    // Salva a sessão simplificada no localStorage (username e level)
+                    const sessionData = {
+                        currentUser: data.username,
+                        currentLevel: data.level,
+                    };
+                    localStorage.setItem('session', JSON.stringify(sessionData));
+                    
+                    // Redireciona para a tela de regras
+                    window.location.href = 'rules.html';
+                } else {
+                    // O servidor indicou falha de autenticação
+                    errorMessage.textContent = data.message || 'Usuário ou senha incorretos. Tente novamente.';
+                    errorMessage.style.display = 'block';
+                }
+            } catch (error) {
+                // Erro de rede ou servidor não está online/acessível
+                console.error('Erro:', error);
+                errorMessage.textContent = 'Erro ao conectar com o servidor. Tente novamente mais tarde.';
                 errorMessage.style.display = 'block';
             }
-        } catch (error) {
-            console.error('Erro:', error);
-            errorMessage.textContent = 'Erro ao conectar com o servidor. Tente novamente mais tarde.';
-            errorMessage.style.display = 'block';
-        }
-    });
-</script>
+        });
+    </script>
 </body>
 </html>
-
